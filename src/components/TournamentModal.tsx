@@ -6,8 +6,8 @@ import type { Tournament } from "@/lib/mockData";
 import { sampleMatches, sampleStandings, statusLabel } from "@/lib/mockData";
 import { Calendar, MapPin, Users, DollarSign, Play, Youtube } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useState } from "react";
-
+import { useState, useTransition } from "react";
+import { createCheckoutSession } from "@/server/stripe";
 export function TournamentModal({
   tournament,
   open,
@@ -187,7 +187,25 @@ export function TournamentModal({
                     onChange={(e) => setTeamName(e.target.value)}
                     className="bg-background border-border"
                   />
-                  <Button className="bg-gradient-to-r from-primary to-primary-glow text-primary-foreground hover:opacity-90 shadow-glow shrink-0">
+                  <Button 
+                    onClick={async () => {
+                      if (!teamName) return;
+                      const res = await createCheckoutSession({
+                        data: {
+                          tournamentId: tournament.id,
+                          tournamentName: tournament.name,
+                          teamName,
+                          price: tournament.entryFee,
+                          origin: window.location.origin,
+                        }
+                      });
+                      if (res.url) {
+                        window.location.href = res.url;
+                      }
+                    }}
+                    disabled={!teamName}
+                    className="bg-gradient-to-r from-primary to-primary-glow text-primary-foreground hover:opacity-90 shadow-glow shrink-0"
+                  >
                     <Play className="h-3.5 w-3.5" /> Pay & Register
                   </Button>
                 </div>
