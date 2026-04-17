@@ -8,11 +8,11 @@ const getStripe = () => {
   if (!key) {
     throw new Error("Missing STRIPE_SECRET_KEY");
   }
-  return new Stripe(key, { apiVersion: "2025-02-24.acacia" }); 
+  return new Stripe(key, { apiVersion: "2026-03-25.dahlia" });
 };
 
 export const createCheckoutSession = createServerFn({ method: "POST" })
-  .validator((data: { tournamentId: string; tournamentName: string; teamName: string; price: number; origin: string }) => data)
+  .inputValidator((data: { tournamentId: string; tournamentName: string; teamName: string; price: number; origin: string }) => data)
   .handler(async ({ data }) => {
     const stripe = getStripe();
 
