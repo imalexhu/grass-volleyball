@@ -5,8 +5,7 @@ import { cn } from "@/lib/utils";
 
 const statusStyles: Record<Tournament["status"], string> = {
   open: "bg-primary/15 text-primary border-primary/30",
-  full: "bg-warning/15 text-warning border-warning/30",
-  in_progress: "bg-destructive/15 text-destructive border-destructive/30 animate-pulse",
+  filled: "bg-warning/15 text-warning border-warning/30",
   complete: "bg-muted text-muted-foreground border-border",
 };
 
@@ -37,9 +36,6 @@ export function TournamentCard({
             statusStyles[tournament.status],
           )}
         >
-          {tournament.status === "in_progress" && (
-            <span className="mr-1.5 h-1.5 w-1.5 rounded-full bg-destructive" />
-          )}
           {statusLabel[tournament.status]}
         </span>
       </div>

@@ -15,6 +15,7 @@ export interface Tournament {
   format: string;
   entryFee: number;
   maxTeams: number;
+  description: string;
   registeredTeams: Team[];
   status: TournamentStatus;
 }

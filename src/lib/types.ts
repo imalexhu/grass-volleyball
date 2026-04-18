@@ -1,4 +1,10 @@
-export type TournamentStatus = "open" | "full" | "in_progress" | "complete";
+export type TournamentStatus = "open" | "filled" | "complete";
+
+export const statusLabel: Record<TournamentStatus, string> = {
+  open: "Open",
+  filled: "Filled",
+  complete: "Complete",
+};
 
 export interface Team {
   id: string;
@@ -46,9 +52,3 @@ export interface Standing {
   tournamentId?: string;
 }
 
-export const statusLabel: Record<TournamentStatus, string> = {
-  open: "Open",
-  full: "Full",
-  in_progress: "Live",
-  complete: "Complete",
-};

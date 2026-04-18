@@ -42,3 +42,15 @@ export const createCheckoutSession = createServerFn({ method: "POST" })
 
     return { url: session.url };
   });
+
+export const retrieveCheckoutSession = createServerFn({ method: "POST" })
+  .inputValidator((data: { sessionId: string }) => data)
+  .handler(async ({ data }) => {
+    const stripe = getStripe();
+    const session = await stripe.checkout.sessions.retrieve(data.sessionId);
+    return {
+      id: session.id,
+      payment_status: session.payment_status,
+      metadata: session.metadata,
+    };
+  });
