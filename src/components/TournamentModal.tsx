@@ -2,8 +2,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import type { Tournament } from "@/lib/mockData";
-import { sampleMatches, sampleStandings, statusLabel } from "@/lib/mockData";
+import type { Tournament } from "@/lib/types";
+import { statusLabel } from "@/lib/types";
+import { sampleMatches, sampleStandings } from "@/lib/mockData";
 import { Calendar, MapPin, Users, DollarSign, Play, Youtube } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useState, useTransition } from "react";
@@ -42,12 +43,15 @@ export function TournamentModal({
               </span>
             </div>
             <DialogTitle className="text-2xl">{tournament.name}</DialogTitle>
+            {tournament.description && (
+              <p className="mt-2 text-sm text-muted-foreground">{tournament.description}</p>
+            )}
           </DialogHeader>
 
           <div className="mt-4 grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
             <Stat icon={Calendar} label={new Date(tournament.dateStart).toLocaleDateString("en-AU", { day: "numeric", month: "short" })} />
             <Stat icon={MapPin} label={tournament.location} />
-            <Stat icon={Users} label={`${tournament.registeredTeams.length}/${tournament.maxTeams} teams`} />
+            <Stat icon={Users} label={`${tournament.registeredTeams?.length || 0}/${tournament.maxTeams} teams`} />
             <Stat icon={DollarSign} label={`$${tournament.entryFee}`} />
           </div>
         </div>
@@ -84,12 +88,6 @@ export function TournamentModal({
                     {m.status === "complete" && (
                       <span className="font-mono text-sm font-semibold tabular-nums">
                         {m.scoreA}–{m.scoreB}
-                      </span>
-                    )}
-                    {m.status === "in_progress" && (
-                      <span className="inline-flex items-center gap-1.5 text-xs font-medium text-destructive">
-                        <span className="h-1.5 w-1.5 rounded-full bg-destructive animate-pulse" />
-                        LIVE {m.scoreA}–{m.scoreB}
                       </span>
                     )}
                     {m.status === "scheduled" && (
@@ -142,7 +140,7 @@ export function TournamentModal({
             </TabsContent>
 
             <TabsContent value="teams" className="mt-4 grid sm:grid-cols-2 gap-2">
-              {tournament.registeredTeams.map((t) => (
+              {(tournament.registeredTeams || []).map((t) => (
                 <div key={t.id} className="rounded-lg border border-border bg-surface px-4 py-3">
                   <div className="text-sm font-medium">{t.name}</div>
                   <div className="text-xs text-muted-foreground">Captain · {t.captain}</div>
@@ -154,16 +152,16 @@ export function TournamentModal({
           <div className="p-6 space-y-6">
             <div>
               <h4 className="text-xs uppercase tracking-wider text-muted-foreground mb-3">
-                Registered teams ({tournament.registeredTeams.length}/{tournament.maxTeams})
+                Registered teams ({tournament.registeredTeams?.length || 0}/{tournament.maxTeams})
               </h4>
               <div className="grid sm:grid-cols-2 gap-2">
-                {tournament.registeredTeams.map((t) => (
+                {(tournament.registeredTeams || []).map((t) => (
                   <div key={t.id} className="rounded-lg border border-border bg-surface px-4 py-3">
                     <div className="text-sm font-medium">{t.name}</div>
                     <div className="text-xs text-muted-foreground">Captain · {t.captain}</div>
                   </div>
                 ))}
-                {Array.from({ length: tournament.maxTeams - tournament.registeredTeams.length }).map((_, i) => (
+                {Array.from({ length: tournament.maxTeams - (tournament.registeredTeams?.length || 0) }).map((_, i) => (
                   <div
                     key={i}
                     className="rounded-lg border border-dashed border-border/60 px-4 py-3 text-sm text-muted-foreground"

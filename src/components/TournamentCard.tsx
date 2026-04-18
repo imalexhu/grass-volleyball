@@ -1,6 +1,6 @@
 import { Calendar, MapPin, Users, Trophy } from "lucide-react";
-import type { Tournament } from "@/lib/mockData";
-import { statusLabel } from "@/lib/mockData";
+import type { Tournament } from "@/lib/types";
+import { statusLabel } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 const statusStyles: Record<Tournament["status"], string> = {
@@ -17,7 +17,7 @@ export function TournamentCard({
   tournament: Tournament;
   onClick: () => void;
 }) {
-  const filled = tournament.registeredTeams.length;
+  const filled = tournament.registeredTeams?.length || 0;
   const pct = (filled / tournament.maxTeams) * 100;
 
   return (

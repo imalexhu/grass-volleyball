@@ -2,8 +2,9 @@ import { createFileRoute } from "@tanstack/react-router";
 import { SiteHeader } from "@/components/SiteHeader";
 import { TournamentCard } from "@/components/TournamentCard";
 import { TournamentModal } from "@/components/TournamentModal";
-import { tournaments } from "@/lib/mockData";
-import type { Tournament, TournamentStatus } from "@/lib/mockData";
+import { getTournaments } from "@/lib/api";
+import type { Tournament, TournamentStatus } from "@/lib/types";
+import { useQuery } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Search } from "lucide-react";
@@ -31,6 +32,11 @@ function Home() {
   const [filter, setFilter] = useState<"all" | TournamentStatus>("all");
   const [query, setQuery] = useState("");
 
+  const { data: tournaments = [], isLoading } = useQuery({
+    queryKey: ["tournaments"],
+    queryFn: getTournaments,
+  });
+
   const list = useMemo(
     () =>
       tournaments.filter(
@@ -38,7 +44,7 @@ function Home() {
           (filter === "all" || t.status === filter) &&
           t.name.toLowerCase().includes(query.toLowerCase()),
       ),
-    [filter, query],
+    [filter, query, tournaments],
   );
 
   return (
@@ -83,16 +89,22 @@ function Home() {
         </div>
 
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {list.map((t) => (
-            <TournamentCard key={t.id} tournament={t} onClick={() => setActive(t)} />
-          ))}
+          {isLoading ? (
+            <div className="col-span-full py-20 text-center text-muted-foreground text-sm">
+              Loading tournaments...
+            </div>
+          ) : list.length > 0 ? (
+            list.map((t) => (
+              <TournamentCard key={t.id} tournament={t} onClick={() => setActive(t)} />
+            ))
+          ) : (
+             <div className="col-span-full py-20 text-center text-muted-foreground text-sm">
+                No tournaments match your filters.
+             </div>
+          )}
         </div>
 
-        {list.length === 0 && (
-          <div className="text-center py-20 text-muted-foreground text-sm">
-            No tournaments match your filters.
-          </div>
-        )}
+
       </div>
 
       <TournamentModal tournament={active} open={!!active} onOpenChange={(v) => !v && setActive(null)} />

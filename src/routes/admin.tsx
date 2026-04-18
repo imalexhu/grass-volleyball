@@ -1,9 +1,12 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { SiteHeader } from "@/components/SiteHeader";
-import { tournaments, sampleMatches } from "@/lib/mockData";
+import { tournaments as mockTournaments } from "@/lib/mockData";
+import { getTournaments, createTournament } from "@/lib/api";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
-import { Trophy, Users, Video, Calendar, Plus, Radio, ArrowUpRight } from "lucide-react";
+import { Trophy, Users, Video, Calendar, Plus, Radio, ArrowUpRight, Database } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { toast } from "sonner";
 
 export const Route = createFileRoute("/admin")({
   component: Admin,
@@ -11,10 +14,32 @@ export const Route = createFileRoute("/admin")({
 });
 
 function Admin() {
-  const liveMatch = sampleMatches.find((m) => m.status === "in_progress");
+  const queryClient = useQueryClient();
+  const { data: tournaments = [], isLoading } = useQuery({
+    queryKey: ["tournaments"],
+    queryFn: getTournaments,
+  });
+
+  const seedMutation = useMutation({
+    mutationFn: async () => {
+      // Seed tournaments
+      for (const t of mockTournaments) {
+        const { id, ...data } = t;
+        await createTournament(data);
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["tournaments"] });
+      toast.success("Successfully seeded mock data to Firestore");
+    },
+    onError: (error) => {
+      console.error("Failed to seed data:", error);
+      toast.error("Failed to seed data. Check console for details.");
+    }
+  });
+
   const open = tournaments.filter((t) => t.status === "open").length;
-  const live = tournaments.filter((t) => t.status === "in_progress").length;
-  const teams = tournaments.reduce((s, t) => s + t.registeredTeams.length, 0);
+  const teams = tournaments.reduce((s, t) => s + (t.registeredTeams?.length || 0), 0);
 
   return (
     <div className="min-h-screen">
@@ -26,43 +51,26 @@ function Admin() {
             <div className="text-xs uppercase tracking-wider text-primary mb-1">Admin</div>
             <h1 className="text-3xl sm:text-4xl font-semibold tracking-tight">Dashboard</h1>
           </div>
-          <Button className="bg-gradient-to-r from-primary to-primary-glow text-primary-foreground hover:opacity-90 shadow-glow">
-            <Plus className="h-4 w-4" /> New tournament
-          </Button>
+          <div className="flex gap-2">
+            <Button 
+              variant="outline" 
+              onClick={() => seedMutation.mutate()} 
+              disabled={seedMutation.isPending}
+            >
+              <Database className="h-4 w-4 mr-2" /> 
+              {seedMutation.isPending ? "Seeding..." : "Seed Data"}
+            </Button>
+            <Button className="bg-gradient-to-r from-primary to-primary-glow text-primary-foreground hover:opacity-90 shadow-glow">
+              <Plus className="h-4 w-4 mr-2" /> New tournament
+            </Button>
+          </div>
         </div>
 
-        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+        <div className="grid sm:grid-cols-3 gap-4 mb-8">
           <Stat icon={Calendar} label="Open registrations" value={open} />
-          <Stat icon={Radio} label="Live now" value={live} accent />
           <Stat icon={Users} label="Total registered teams" value={teams} />
           <Stat icon={Video} label="VOD jobs pending" value={2} />
         </div>
-
-        {liveMatch && (
-          <Link
-            to="/admin/score/$matchId"
-            params={{ matchId: liveMatch.id }}
-            className="block rounded-2xl border border-destructive/40 bg-destructive/5 p-5 mb-8 hover:border-destructive/60 transition-colors group"
-          >
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <span className="relative flex h-3 w-3">
-                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-destructive opacity-60" />
-                  <span className="relative inline-flex h-3 w-3 rounded-full bg-destructive" />
-                </span>
-                <div>
-                  <div className="text-xs uppercase tracking-wider text-destructive">Match in progress</div>
-                  <div className="font-semibold mt-0.5">
-                    {liveMatch.teamA} vs {liveMatch.teamB} · Court {liveMatch.court}
-                  </div>
-                </div>
-              </div>
-              <Button variant="outline" size="sm" className="border-destructive/40 group-hover:border-destructive">
-                Open scoring pad <ArrowUpRight className="h-3.5 w-3.5" />
-              </Button>
-            </div>
-          </Link>
-        )}
 
         <div className="grid lg:grid-cols-3 gap-6">
           <div className="lg:col-span-2">
@@ -80,14 +88,18 @@ function Admin() {
                   </tr>
                 </thead>
                 <tbody>
-                  {tournaments.map((t) => (
+                  {isLoading ? (
+                    <tr><td colSpan={4} className="px-4 py-8 text-center text-muted-foreground text-sm">Loading...</td></tr>
+                  ) : tournaments.length === 0 ? (
+                    <tr><td colSpan={4} className="px-4 py-8 text-center text-muted-foreground text-sm">No tournaments found. Seed some data to get started.</td></tr>
+                  ) : tournaments.map((t) => (
                     <tr key={t.id} className="border-t border-border hover:bg-muted/30 transition-colors">
                       <td className="px-4 py-3 font-medium">{t.name}</td>
                       <td className="px-4 py-3 text-muted-foreground">
                         {new Date(t.dateStart).toLocaleDateString("en-AU", { day: "numeric", month: "short" })}
                       </td>
                       <td className="px-4 py-3 text-right tabular-nums">
-                        {t.registeredTeams.length}/{t.maxTeams}
+                        {t.registeredTeams?.length || 0}/{t.maxTeams}
                       </td>
                       <td className="px-4 py-3 text-right">
                         <span
