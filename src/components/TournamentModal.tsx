@@ -27,6 +27,12 @@ export function TournamentModal({
   const [matches, setMatches] = useState<Match[]>([]);
   const [standings, setStandings] = useState<Standing[]>([]);
   const [loading, setLoading] = useState(false);
+
+  // Filters
+  const [searchTeam, setSearchTeam] = useState("");
+  const [filterPool, setFilterPool] = useState<"All" | "A" | "B">("All");
+  const [filterGame, setFilterGame] = useState<"All" | string>("All");
+  const [sortBy, setSortBy] = useState<"game" | "team">("game");
   useEffect(() => {
     if (open && tournament?.id) {
       setLoading(true);
@@ -48,6 +54,27 @@ export function TournamentModal({
   const showFixtures = (tournament.status === "filled" || tournament.status === "complete") && matches.length > 0;
   const isOpen = tournament.status === "open";
   const noFixturesYet = (tournament.status === "filled" || tournament.status === "complete") && matches.length === 0;
+
+  const sortedMatches = [...matches].sort((a, b) => new Date(a.scheduledAt).getTime() - new Date(b.scheduledAt).getTime());
+  
+  const filteredMatches = sortedMatches.filter((m, idx) => {
+    const gameNum = idx + 1;
+    const matchesTeam = m.teamA.toLowerCase().includes(searchTeam.toLowerCase()) || 
+                       m.teamB.toLowerCase().includes(searchTeam.toLowerCase());
+    const matchesPool = filterPool === "All" || m.pool === filterPool;
+    const matchesGame = filterGame === "All" || gameNum.toString() === filterGame;
+    
+    return matchesTeam && matchesPool && matchesGame;
+  });
+
+  const sortedFilteredMatches = [...filteredMatches].sort((a, b) => {
+    if (sortBy === "game") {
+      return new Date(a.scheduledAt).getTime() - new Date(b.scheduledAt).getTime();
+    }
+    return a.teamA.localeCompare(b.teamA);
+  });
+
+  const availableGames = Array.from({ length: matches.length }, (_, i) => (i + 1).toString());
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -93,18 +120,61 @@ export function TournamentModal({
               <TabsTrigger value="teams">Teams</TabsTrigger>
             </TabsList>
 
-            <TabsContent value="fixtures" className="mt-4 space-y-2">
-              {matches.map((m) => {
+            <TabsContent value="fixtures" className="mt-4 space-y-4">
+              <div className="flex flex-col sm:flex-row gap-2">
+                <div className="relative flex-1">
+                  <Input 
+                    placeholder="Search by team..." 
+                    value={searchTeam}
+                    onChange={(e) => setSearchTeam(e.target.value)}
+                    className="bg-muted/30 border-border h-9 text-xs pl-8"
+                  />
+                  <Users className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground/50" />
+                </div>
+                <div className="flex gap-2">
+                  <select 
+                    value={filterPool}
+                    onChange={(e) => setFilterPool(e.target.value as any)}
+                    className="bg-muted/30 border border-border rounded-md px-3 h-9 text-xs focus:ring-1 focus:ring-primary outline-none min-w-[100px]"
+                  >
+                    <option value="All">All Pools</option>
+                    <option value="A">Pool A</option>
+                    <option value="B">Pool B</option>
+                  </select>
+                  <select 
+                    value={filterGame}
+                    onChange={(e) => setFilterGame(e.target.value)}
+                    className="bg-muted/30 border border-border rounded-md px-3 h-9 text-xs focus:ring-1 focus:ring-primary outline-none min-w-[100px]"
+                  >
+                    <option value="All">All Games</option>
+                    {availableGames.map(g => (
+                      <option key={g} value={g}>Game {g}</option>
+                    ))}
+                  </select>
+                  <select 
+                    value={sortBy}
+                    onChange={(e) => setSortBy(e.target.value as any)}
+                    className="bg-muted/30 border border-border rounded-md px-3 h-9 text-xs focus:ring-1 focus:ring-primary outline-none min-w-[100px]"
+                  >
+                    <option value="game">Sort by Game</option>
+                    <option value="team">Sort by Team</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+              {sortedFilteredMatches.map((m) => {
+                const gameIndex = sortedMatches.findIndex(x => x.id === m.id) + 1;
                 const MatchContent = (
                   <div
                     className={cn(
-                      "flex items-center justify-between rounded-lg border border-border bg-surface px-4 py-3 hover:border-primary/30 transition-colors",
-                      isAdmin && "hover:bg-muted/30 cursor-pointer"
+                      "flex items-center justify-between rounded-lg border border-border bg-surface px-4 py-3 hover:border-primary/30 transition-colors group",
+                      isAdmin && "hover:bg-primary/5 cursor-pointer ring-offset-background hover:ring-1 hover:ring-primary/20"
                     )}
                   >
                     <div className="flex items-center gap-4 min-w-0">
                       <div className="text-xs text-muted-foreground w-16 shrink-0">
-                        <div>{new Date(m.scheduledAt).toLocaleTimeString("en-AU", { hour: "numeric", minute: "2-digit" })}</div>
+                        <div className="font-semibold text-primary/80">Game {gameIndex}</div>
                         <div className="text-[10px] uppercase">Court {m.court}</div>
                       </div>
                       <div className="min-w-0">
@@ -126,18 +196,41 @@ export function TournamentModal({
                         <span className="text-xs text-muted-foreground">Upcoming</span>
                       )}
                       {isAdmin && <ChevronRight className="h-4 w-4 text-muted-foreground" />}
-                      {m.vodUrl && (
-                        <Button size="sm" variant="ghost" className="h-7 px-2">
-                          <Youtube className="h-3.5 w-3.5 text-destructive" />
-                        </Button>
-                      )}
+                      <div className="flex gap-1">
+                        {m.vodUrlA && (
+                          <Button size="sm" variant="ghost" className="h-7 px-2" title="Team A VOD" asChild>
+                            <a href={m.vodUrlA} target="_blank" rel="noreferrer">
+                              <Play className="h-3.5 w-3.5 text-primary" />
+                            </a>
+                          </Button>
+                        )}
+                        {m.vodUrlB && (
+                          <Button size="sm" variant="ghost" className="h-7 px-2" title="Team B VOD" asChild>
+                            <a href={m.vodUrlB} target="_blank" rel="noreferrer">
+                              <Play className="h-3.5 w-3.5 text-secondary" />
+                            </a>
+                          </Button>
+                        )}
+                        {m.matchHighlightsUrl && (
+                          <Button size="sm" variant="ghost" className="h-7 px-2" title="Highlights" asChild>
+                            <a href={m.matchHighlightsUrl} target="_blank" rel="noreferrer">
+                              <Youtube className="h-3.5 w-3.5 text-destructive" />
+                            </a>
+                          </Button>
+                        )}
+                      </div>
                     </div>
                   </div>
                 );
 
                 if (isAdmin) {
                   return (
-                    <Link key={m.id} to={`/admin/score/${m.id}`} className="block no-underline">
+                    <Link 
+                      key={m.id} 
+                      to="/admin/score/$matchId" 
+                      params={{ matchId: m.id }}
+                      className="block no-underline"
+                    >
                       {MatchContent}
                     </Link>
                   );
@@ -145,6 +238,12 @@ export function TournamentModal({
 
                 return <div key={m.id}>{MatchContent}</div>;
               })}
+              {filteredMatches.length === 0 && (
+                <div className="p-8 text-center text-muted-foreground italic border border-dashed rounded-lg">
+                  No matches found matching your filters.
+                </div>
+              )}
+              </div>
             </TabsContent>
 
             <TabsContent value="standings" className="mt-4">
@@ -197,24 +296,55 @@ export function TournamentModal({
             </TabsContent>
 
             <TabsContent value="teams" className="mt-4 grid sm:grid-cols-2 gap-2">
-              {(tournament.registeredTeams || []).map((t) => (
-                <div key={t.id} className="rounded-lg border border-border bg-surface px-4 py-3">
-                  <div className="text-sm font-medium">{t.name}</div>
-                  <div className="text-xs text-muted-foreground">Captain · {t.captain}</div>
-                </div>
-              ))}
+              {[...(tournament.registeredTeams || [])]
+                .sort((a, b) => a.name.localeCompare(b.name))
+                .map((t) => (
+                  <div key={t.id} className="rounded-lg border border-border bg-surface px-4 py-3">
+                    <div className="text-sm font-medium">{t.name}</div>
+                    <div className="text-xs text-muted-foreground">Captain · {t.captain}</div>
+                  </div>
+                ))}
             </TabsContent>
           </Tabs>
         ) : (
           <div className="p-6 space-y-6">
             {noFixturesYet && (
-              <div className="rounded-xl border border-primary/30 bg-primary/10 p-4 mb-4 text-center">
-                <h4 className="font-semibold text-primary flex items-center justify-center gap-2">
-                  <Zap className="h-4 w-4" /> Fixtures coming soon
+              <div className="rounded-xl border border-primary/30 bg-primary/10 p-6 text-center">
+                <div className="flex justify-center mb-4">
+                  <div className="h-12 w-12 rounded-full bg-primary/20 flex items-center justify-center">
+                    <Zap className="h-6 w-6 text-primary animate-pulse" />
+                  </div>
+                </div>
+                <h4 className="font-semibold text-lg text-primary mb-2">
+                  Ready for Fixtures
                 </h4>
-                <p className="text-xs text-muted-foreground mt-1">
-                  The tournament is full! Our admins are currently preparing the match schedule.
+                <p className="text-sm text-muted-foreground mb-6 max-w-sm mx-auto">
+                  The tournament has reached its capacity. Generate the pool play and placement matches now.
                 </p>
+                {isAdmin ? (
+                  <Button 
+                    onClick={async () => {
+                      setLoading(true);
+                      console.log("Admin clicked Generate Fixtures for:", tournament.id);
+                      import("@/lib/api").then(api => api.createFixtures(tournament.id))
+                        .then(() => {
+                          console.log("Fixtures generated, reloading...");
+                          window.location.reload();
+                        })
+                        .catch(err => {
+                          console.error("Fixture generation failed:", err);
+                        })
+                        .finally(() => setLoading(false));
+                    }}
+                    className="bg-primary hover:bg-primary-glow text-primary-foreground shadow-glow-sm px-8"
+                  >
+                    <Zap className="h-4 w-4 mr-2" /> Generate 8-Team Fixture
+                  </Button>
+                ) : (
+                  <p className="text-xs text-muted-foreground">
+                    Our admins are currently preparing the match schedule. Check back soon!
+                  </p>
+                )}
               </div>
             )}
             <div>
@@ -222,12 +352,14 @@ export function TournamentModal({
                 Registered teams ({tournament.registeredTeams?.length || 0}/{tournament.maxTeams})
               </h4>
               <div className="grid sm:grid-cols-2 gap-2">
-                {(tournament.registeredTeams || []).map((t) => (
-                  <div key={t.id} className="rounded-lg border border-border bg-surface px-4 py-3">
-                    <div className="text-sm font-medium">{t.name}</div>
-                    <div className="text-xs text-muted-foreground">Captain · {t.captain}</div>
-                  </div>
-                ))}
+                {[...(tournament.registeredTeams || [])]
+                  .sort((a, b) => a.name.localeCompare(b.name))
+                  .map((t) => (
+                    <div key={t.id} className="rounded-lg border border-border bg-surface px-4 py-3">
+                      <div className="text-sm font-medium">{t.name}</div>
+                      <div className="text-xs text-muted-foreground">Captain · {t.captain}</div>
+                    </div>
+                  ))}
                 {Array.from({ length: tournament.maxTeams - (tournament.registeredTeams?.length || 0) }).map((_, i) => (
                   <div
                     key={i}

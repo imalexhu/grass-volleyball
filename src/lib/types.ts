@@ -26,6 +26,15 @@ export interface Tournament {
   status: TournamentStatus;
 }
 
+export interface MatchEvent {
+  id: string;
+  type: "serve" | "point";
+  team?: "A" | "B";
+  timestamp: number;
+  scoreA: number;
+  scoreB: number;
+}
+
 export interface Match {
   id: string;
   stage: "pool" | "placement" | "final";
@@ -37,8 +46,12 @@ export interface Match {
   scoreA?: number;
   scoreB?: number;
   status: "scheduled" | "complete";
-  vodUrl?: string;
+  vodUrlA?: string;
+  vodUrlB?: string;
+  matchHighlightsUrl?: string;
   tournamentId?: string;
+  label?: string;
+  events?: MatchEvent[];
 }
 
 export interface Standing {

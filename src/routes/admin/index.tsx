@@ -15,7 +15,7 @@ import { Loader2, Zap } from "lucide-react";
 import { TournamentModal } from "@/components/TournamentModal";
 import { useState } from "react";
 
-export const Route = createFileRoute("/admin")({
+export const Route = createFileRoute("/admin/")({
   component: Admin,
   head: () => ({ meta: [{ title: "Admin — Adelaide Grass Volleyball" }] }),
 });

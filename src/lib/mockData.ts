@@ -31,7 +31,10 @@ export interface Match {
   scoreA?: number;
   scoreB?: number;
   status: "scheduled" | "in_progress" | "complete";
-  vodUrl?: string;
+  vodUrlA?: string;
+  vodUrlB?: string;
+  matchHighlightsUrl?: string;
+  label?: string;
 }
 
 export interface Standing {
