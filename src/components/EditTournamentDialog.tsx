@@ -45,7 +45,7 @@ const tournamentSchema = z.object({
   description: z.string().optional(),
   entryFee: z.number().min(0, "Entry fee must be at least 0"),
   maxTeams: z.number().min(2, "Must have at least 2 teams"),
-  status: z.enum(["open", "full", "in_progress", "complete"]),
+  status: z.enum(["open", "filled", "complete"]),
 }).refine((data) => !isBefore(startOfDay(data.dateEnd), startOfDay(data.dateStart)), {
   message: "End date must be after or equal to start date",
   path: ["dateEnd"],
@@ -225,8 +225,7 @@ export function EditTournamentDialog({ tournament }: EditTournamentDialogProps) 
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="open">Open</SelectItem>
-                    <SelectItem value="full">Full</SelectItem>
-                    <SelectItem value="in_progress">Live</SelectItem>
+                    <SelectItem value="filled">Filled</SelectItem>
                     <SelectItem value="complete">Complete</SelectItem>
                   </SelectContent>
                 </Select>

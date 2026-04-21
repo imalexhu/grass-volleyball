@@ -1,6 +1,6 @@
-import { collection, doc, getDocs, getDoc, addDoc, updateDoc, deleteDoc, query, where, orderBy } from "firebase/firestore";
+import { collection, doc, getDocs, getDoc, addDoc, updateDoc, deleteDoc, query, where, orderBy, onSnapshot } from "firebase/firestore";
 import { db } from "./firebase";
-import type { Tournament, Match, Standing, Team } from "./types";
+import type { Tournament, Match, Standing, Team, MatchEvent } from "./types";
 
 // Collections
 export const tournamentsCollection = collection(db, "tournaments");
@@ -21,6 +21,21 @@ export const getTournament = async (id: string): Promise<Tournament | null> => {
     return { id: snapshot.id, ...snapshot.data() } as Tournament;
   }
   return null;
+};
+
+// Helper to strip undefined values for Firestore
+const sanitizeData = (obj: any): any => {
+  if (Array.isArray(obj)) {
+    return obj.map(sanitizeData);
+  }
+  if (obj !== null && typeof obj === 'object') {
+    return Object.fromEntries(
+      Object.entries(obj)
+        .filter(([_, v]) => v !== undefined)
+        .map(([k, v]) => [k, sanitizeData(v)])
+    );
+  }
+  return obj;
 };
 
 export const createTournament = async (tournament: Omit<Tournament, "id">): Promise<string> => {
@@ -249,6 +264,11 @@ export const completeTournament = async (id: string): Promise<void> => {
   await updateTournament(id, { status: "complete" });
 };
 
+export const createMatch = async (match: Omit<Match, "id">): Promise<string> => {
+  const docRef = await addDoc(matchesCollection, match);
+  return docRef.id;
+};
+
 // Matches
 export const getMatches = async (tournamentId?: string): Promise<Match[]> => {
   let q = query(matchesCollection);
@@ -260,9 +280,55 @@ export const getMatches = async (tournamentId?: string): Promise<Match[]> => {
 };
 
 export const getRunningMatches = async (): Promise<Match[]> => {
-  const q = query(matchesCollection, where("status", "==", "scheduled")); // Use scheduled for active matches
+  const q = query(matchesCollection, where("status", "==", "live"));
   const snapshot = await getDocs(q);
   return snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }) as Match);
+};
+
+export const subscribeToLiveMatches = (callback: (matches: Match[]) => void) => {
+  const q = query(matchesCollection, where("status", "==", "live"));
+  return onSnapshot(q, (snapshot) => {
+    const matches = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }) as Match);
+    callback(matches);
+  });
+};
+
+export const subscribeToMatch = (matchId: string, callback: (match: Match) => void) => {
+  const docRef = doc(db, "matches", matchId);
+  return onSnapshot(docRef, (doc) => {
+    if (doc.exists()) {
+      callback({ id: doc.id, ...doc.data() } as Match);
+    }
+  });
+};
+
+export const startMatch = async (matchId: string): Promise<void> => {
+  const docRef = doc(db, "matches", matchId);
+  await updateDoc(docRef, { 
+    status: "live",
+    currentSetScoreA: 0,
+    currentSetScoreB: 0,
+    events: []
+  });
+};
+
+export const updateMatchLiveScore = async (
+  matchId: string, 
+  scoreA: number, 
+  scoreB: number, 
+  events: MatchEvent[]
+): Promise<void> => {
+  const docRef = doc(db, "matches", matchId);
+  await updateDoc(docRef, sanitizeData({
+    currentSetScoreA: scoreA,
+    currentSetScoreB: scoreB,
+    events: events
+  }));
+};
+
+export const updateMatchEvents = async (matchId: string, events: MatchEvent[]): Promise<void> => {
+  const docRef = doc(db, "matches", matchId);
+  await updateDoc(docRef, sanitizeData({ events }));
 };
 
 export const getStandings = async (tournamentId: string): Promise<Standing[]> => {
@@ -299,12 +365,14 @@ export const updateMatchResult = async (
   const match = { id: matchSnap.id, ...matchSnap.data() } as Match;
 
   // 1. Update the match itself
-  await updateDoc(matchRef, {
+  await updateDoc(matchRef, sanitizeData({
     scoreA,
     scoreB,
     status: "complete",
+    currentSetScoreA: 0, // Reset live scores
+    currentSetScoreB: 0,
     ...extras
-  });
+  }));
 
   if (match.stage === "pool" && match.tournamentId) {
     // 2. Update standings
@@ -316,6 +384,14 @@ export const updateMatchResult = async (
     // 4. Update next round placeholders
     if (match.tournamentId) {
       await updateNextRoundPlaceholders(match.tournamentId, match);
+      
+      // 5. Update final rankings if applicable
+      await updateRankingsFromMatch(match.tournamentId, match, scoreA, scoreB);
+
+      // 6. If this was the Final, mark tournament as complete
+      if (match.stage === "final" && match.label === "Final") {
+        await completeTournament(match.tournamentId);
+      }
     }
   }
 };
@@ -354,8 +430,8 @@ const checkAndPopulateInitialPlacements = async (tournamentId: string) => {
 
   if (allPoolMatchesComplete) {
     const standings = await getStandings(tournamentId);
-    const poolA = standings.filter(s => (s as any).pool === "A");
-    const poolB = standings.filter(s => (s as any).pool === "B");
+    const poolA = standings.filter(s => s.pool === "A");
+    const poolB = standings.filter(s => s.pool === "B");
 
     // Update A1 vs B4, etc.
     const placements = allMatches.filter(m => m.stage === "placement");
@@ -407,6 +483,32 @@ const updateNextRoundPlaceholders = async (tournamentId: string, completedMatch:
     if (changed) {
       await updateDoc(doc(matchesCollection, m.id), { teamA: newA, teamB: newB });
     }
+  }
+};
+
+const updateRankingsFromMatch = async (tournamentId: string, match: Match, scoreA: number, scoreB: number) => {
+  const winner = scoreA > scoreB ? match.teamA : match.teamB;
+  const loser = scoreA > scoreB ? match.teamB : match.teamA;
+
+  if (match.stage === "final") {
+    if (match.label === "Final") {
+      await updateTeamRank(tournamentId, winner, 1);
+      await updateTeamRank(tournamentId, loser, 2);
+    } else if (match.label === "Bronze") {
+      await updateTeamRank(tournamentId, winner, 3);
+      await updateTeamRank(tournamentId, loser, 4);
+    }
+  } else if (match.stage === "placement") {
+    // Logic for other placement matches can be added here
+    // e.g. 5th/6th, 7th/8th
+  }
+};
+
+const updateTeamRank = async (tournamentId: string, teamName: string, rank: number) => {
+  const q = query(standingsCollection, where("tournamentId", "==", tournamentId), where("team", "==", teamName));
+  const snap = await getDocs(q);
+  if (!snap.empty) {
+    await updateDoc(doc(standingsCollection, snap.docs[0].id), { rank });
   }
 };
 

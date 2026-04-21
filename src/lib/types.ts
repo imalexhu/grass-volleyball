@@ -28,11 +28,13 @@ export interface Tournament {
 
 export interface MatchEvent {
   id: string;
-  type: "serve" | "point";
+  type: "serve" | "point" | "set-finish";
   team?: "A" | "B";
   timestamp: number;
   scoreA: number;
   scoreB: number;
+  isHighlight?: boolean;
+  setIndex?: number;
 }
 
 export interface Match {
@@ -45,7 +47,9 @@ export interface Match {
   scheduledAt: string;
   scoreA?: number;
   scoreB?: number;
-  status: "scheduled" | "complete";
+  currentSetScoreA?: number;
+  currentSetScoreB?: number;
+  status: "scheduled" | "live" | "complete";
   vodUrlA?: string;
   vodUrlB?: string;
   matchHighlightsUrl?: string;
@@ -55,6 +59,7 @@ export interface Match {
 }
 
 export interface Standing {
+  id: string;
   rank: number;
   team: string;
   played: number;
@@ -63,5 +68,6 @@ export interface Standing {
   points: number;
   diff: number;
   tournamentId?: string;
+  pool?: "A" | "B";
 }
 

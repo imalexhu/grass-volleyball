@@ -14,6 +14,10 @@ import { statusLabel, type Tournament } from "@/lib/types";
 import { Loader2, Zap } from "lucide-react";
 import { TournamentModal } from "@/components/TournamentModal";
 import { useState } from "react";
+import { QuickMatchDialog } from "@/components/QuickMatchDialog";
+import { getMatches, getTournament } from "@/lib/api";
+import type { Match } from "@/lib/types";
+import { useNavigate } from "@tanstack/react-router";
 
 export const Route = createFileRoute("/admin/")({
   component: Admin,
@@ -22,10 +26,46 @@ export const Route = createFileRoute("/admin/")({
 
 function Admin() {
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
   const [activeTournament, setActiveTournament] = useState<Tournament | null>(null);
   const { data: tournaments = [], isLoading } = useQuery({
     queryKey: ["tournaments"],
     queryFn: getTournaments,
+  });
+
+  const { data: allMatches = [], isLoading: isLoadingMatches } = useQuery({
+    queryKey: ["all-matches"],
+    queryFn: () => getMatches(),
+  });
+
+  const [sortConfig, setSortConfig] = useState<{ field: "court" | "status" | "scheduledAt", direction: "asc" | "desc" }>({
+    field: "scheduledAt",
+    direction: "desc"
+  });
+
+  const toggleSort = (field: "court" | "status") => {
+    setSortConfig(prev => ({
+      field,
+      direction: prev.field === field && prev.direction === "asc" ? "desc" : "asc"
+    }));
+  };
+
+  const sortedMatches = [...allMatches].sort((a, b) => {
+    // 1. Live matches always at the top
+    if (a.status === "live" && b.status !== "live") return -1;
+    if (b.status === "live" && a.status !== "live") return 1;
+
+    // 2. Secondary sort based on user selection
+    let comparison = 0;
+    if (sortConfig.field === "court") {
+      comparison = a.court - b.court;
+    } else if (sortConfig.field === "status") {
+      comparison = a.status.localeCompare(b.status);
+    } else {
+      comparison = new Date(a.scheduledAt).getTime() - new Date(b.scheduledAt).getTime();
+    }
+
+    return sortConfig.direction === "asc" ? comparison : -comparison;
   });
 
   const seedMutation = useMutation({
@@ -248,21 +288,124 @@ function Admin() {
                 </tbody>
               </table>
             </div>
+
+            <div className="flex items-center justify-between mb-3 mt-10">
+              <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">All Matches</h2>
+              <div className="text-[10px] text-muted-foreground font-bold bg-muted px-2 py-0.5 rounded uppercase tracking-widest">{allMatches.length} Total</div>
+            </div>
+            <div className="rounded-2xl border border-border bg-card overflow-hidden">
+              <table className="w-full text-sm">
+                <thead className="bg-muted/50 text-xs uppercase text-muted-foreground">
+                  <tr>
+                    <th className="px-4 py-3 text-left">Match</th>
+                    <th 
+                      className="px-4 py-3 text-left cursor-pointer hover:text-primary transition-colors"
+                      onClick={() => toggleSort("court")}
+                    >
+                      <div className="flex items-center gap-1">
+                        Court
+                        {sortConfig.field === "court" && (
+                          <span className="text-[10px]">{sortConfig.direction === "asc" ? "↑" : "↓"}</span>
+                        )}
+                      </div>
+                    </th>
+                    <th className="px-4 py-3 text-right">Score</th>
+                    <th 
+                      className="px-4 py-3 text-right cursor-pointer hover:text-primary transition-colors"
+                      onClick={() => toggleSort("status")}
+                    >
+                      <div className="flex items-center justify-end gap-1">
+                        Status
+                        {sortConfig.field === "status" && (
+                          <span className="text-[10px]">{sortConfig.direction === "asc" ? "↑" : "↓"}</span>
+                        )}
+                      </div>
+                    </th>
+                    <th className="px-4 py-3 text-right">Scoring</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {isLoadingMatches ? (
+                    <tr><td colSpan={5} className="px-4 py-8 text-center text-muted-foreground text-sm">Loading matches...</td></tr>
+                  ) : sortedMatches.length === 0 ? (
+                    <tr><td colSpan={5} className="px-4 py-8 text-center text-muted-foreground text-sm">No matches found.</td></tr>
+                  ) : sortedMatches.map((m) => (
+                    <tr 
+                      key={m.id} 
+                      className="border-t border-border hover:bg-muted/30 transition-colors cursor-pointer group"
+                      onClick={() => {
+                        const tournament = tournaments.find(t => t.id === m.tournamentId);
+                        if (tournament) {
+                          setActiveTournament(tournament);
+                        } else if (m.tournamentId) {
+                          getTournament(m.tournamentId).then(t => {
+                            if (t) setActiveTournament(t);
+                          });
+                        }
+                      }}
+                    >
+                      <td className="px-4 py-3 font-medium">
+                        <div className="flex flex-col">
+                          <span className="font-bold group-hover:text-primary transition-colors">{m.teamA} vs {m.teamB}</span>
+                          <span className="text-[10px] text-muted-foreground uppercase">{m.stage} {m.label ? `· ${m.label}` : ""}</span>
+                        </div>
+                      </td>
+                      <td className="px-4 py-3">Court {m.court}</td>
+                      <td className="px-4 py-3 text-right tabular-nums">
+                        {m.status === "complete" ? (
+                          <div className="flex flex-col items-end">
+                            <span className="font-black text-primary">{m.scoreA} - {m.scoreB}</span>
+                            <span className="text-[9px] text-muted-foreground uppercase font-bold">Final</span>
+                          </div>
+                        ) : m.status === "live" ? (
+                          <div className="flex flex-col items-end">
+                            <span className="font-black text-destructive animate-pulse">
+                              {m.events && m.events.length > 0 ? (m.events[m.events.length-1].scoreA) : 0} - {m.events && m.events.length > 0 ? (m.events[m.events.length-1].scoreB) : 0}
+                            </span>
+                            <span className="text-[9px] text-destructive uppercase font-bold">Live Set</span>
+                          </div>
+                        ) : (
+                          <span className="text-muted-foreground italic text-xs">Pending</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        <span
+                          className={cn(
+                            "inline-flex rounded-full border px-2 py-0.5 text-[10px] uppercase font-black tracking-widest",
+                            m.status === "scheduled" && "border-border bg-muted text-muted-foreground",
+                            m.status === "live" && "border-destructive/30 bg-destructive/10 text-destructive",
+                            m.status === "complete" && "border-success/30 bg-success/10 text-success",
+                          )}
+                        >
+                          {m.status}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-right" onClick={(e) => e.stopPropagation()}>
+                        <Button asChild size="sm" variant="ghost" className="h-8 group/btn">
+                          <Link to={`/admin/score/${m.id}`}>
+                            Score <Zap className="ml-2 h-3 w-3 text-primary group-hover/btn:fill-primary" />
+                          </Link>
+                        </Button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
 
           <div>
             <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground mb-3">Quick actions</h2>
             <div className="space-y-2">
+              <QuickMatchDialog />
               <Action
                 icon={Zap}
                 label="Quick Test: 8-Team Fixture"
                 onClick={() => testFixtureMutation.mutate()}
                 loading={testFixtureMutation.isPending}
               />
-              <Action icon={Trophy} label="Create tournament" />
               <Action icon={Users} label="Manage users" />
               <Action icon={Video} label="VOD pipeline" />
-              <Action icon={Calendar} label="Generate fixtures" />
             </div>
           </div>
         </div>

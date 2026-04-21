@@ -23,7 +23,7 @@ export const Route = createFileRoute("/home")({
 const filters: { label: string; value: "all" | TournamentStatus }[] = [
   { label: "All", value: "all" },
   { label: "Open", value: "open" },
-  { label: "Live", value: "in_progress" },
+  { label: "Filled", value: "filled" },
   { label: "Complete", value: "complete" },
 ];
 

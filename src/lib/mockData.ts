@@ -1,51 +1,6 @@
-export type TournamentStatus = "open" | "full" | "in_progress" | "complete";
+import type { Tournament, Team, TournamentStatus, Match, Standing } from "./types";
 
-export interface Team {
-  id: string;
-  name: string;
-  captain: string;
-}
-
-export interface Tournament {
-  id: string;
-  name: string;
-  dateStart: string;
-  dateEnd: string;
-  location: string;
-  format: string;
-  entryFee: number;
-  maxTeams: number;
-  description: string;
-  registeredTeams: Team[];
-  status: TournamentStatus;
-}
-
-export interface Match {
-  id: string;
-  stage: "pool" | "placement" | "final";
-  pool?: "A" | "B";
-  teamA: string;
-  teamB: string;
-  court: number;
-  scheduledAt: string;
-  scoreA?: number;
-  scoreB?: number;
-  status: "scheduled" | "in_progress" | "complete";
-  vodUrlA?: string;
-  vodUrlB?: string;
-  matchHighlightsUrl?: string;
-  label?: string;
-}
-
-export interface Standing {
-  rank: number;
-  team: string;
-  played: number;
-  won: number;
-  lost: number;
-  points: number;
-  diff: number;
-}
+// Re-exporting or using types from ./types.ts
 
 const sampleTeams = (n: number, prefix = "Team"): Team[] =>
   Array.from({ length: n }, (_, i) => ({
@@ -88,7 +43,7 @@ export const tournaments: Tournament[] = [
     description: "Join us at Henley Beach for a great autumn day of grass volleyball.",
     maxTeams: 8,
     registeredTeams: sampleTeams(8),
-    status: "full",
+    status: "filled",
   },
   {
     id: "trn-3",
@@ -101,7 +56,7 @@ export const tournaments: Tournament[] = [
     description: "The city comes alive with the biggest showdown in Adelaide's parklands.",
     maxTeams: 8,
     registeredTeams: sampleTeams(8),
-    status: "in_progress",
+    status: "filled",
   },
   {
     id: "trn-4",
@@ -145,8 +100,8 @@ export const tournaments: Tournament[] = [
 ];
 
 export const sampleMatches: Match[] = [
-  { id: "m1", stage: "pool", pool: "A", teamA: "Spike Force", teamB: "Sandstorm", court: 1, scheduledAt: "9:00 AM", scoreA: 25, scoreB: 18, status: "complete", vodUrl: "#" },
-  { id: "m2", stage: "pool", pool: "A", teamA: "Net Ninjas", teamB: "Beachside Bandits", court: 2, scheduledAt: "9:00 AM", scoreA: 22, scoreB: 25, status: "complete", vodUrl: "#" },
+  { id: "m1", stage: "pool", pool: "A", teamA: "Spike Force", teamB: "Sandstorm", court: 1, scheduledAt: "9:00 AM", scoreA: 25, scoreB: 18, status: "complete", vodUrlA: "#" },
+  { id: "m2", stage: "pool", pool: "A", teamA: "Net Ninjas", teamB: "Beachside Bandits", court: 2, scheduledAt: "9:00 AM", scoreA: 22, scoreB: 25, status: "complete", vodUrlA: "#" },
   { id: "m3", stage: "pool", pool: "B", teamA: "Grass Goblins", teamB: "Adelaide Aces", court: 1, scheduledAt: "9:45 AM", scoreA: 25, scoreB: 21, status: "complete" },
   { id: "m4", stage: "pool", pool: "B", teamA: "Coastal Crushers", teamB: "Dune Dogs", court: 2, scheduledAt: "9:45 AM", scoreA: 19, scoreB: 25, status: "complete" },
   { id: "m5", stage: "pool", pool: "A", teamA: "Spike Force", teamB: "Net Ninjas", court: 1, scheduledAt: "10:30 AM", status: "scheduled" },
@@ -156,19 +111,18 @@ export const sampleMatches: Match[] = [
 ];
 
 export const sampleStandings: Standing[] = [
-  { rank: 1, team: "Spike Force", played: 3, won: 3, lost: 0, points: 6, diff: 32 },
-  { rank: 2, team: "Net Ninjas", played: 3, won: 2, lost: 1, points: 4, diff: 12 },
-  { rank: 3, team: "Beachside Bandits", played: 3, won: 1, lost: 2, points: 2, diff: -6 },
-  { rank: 4, team: "Sandstorm", played: 3, won: 0, lost: 3, points: 0, diff: -38 },
-  { rank: 1, team: "Grass Goblins", played: 3, won: 3, lost: 0, points: 6, diff: 28 },
-  { rank: 2, team: "Coastal Crushers", played: 3, won: 2, lost: 1, points: 4, diff: 9 },
-  { rank: 3, team: "Adelaide Aces", played: 3, won: 1, lost: 2, points: 2, diff: -4 },
-  { rank: 4, team: "Dune Dogs", played: 3, won: 0, lost: 3, points: 0, diff: -33 },
+  { id: "s1", rank: 1, team: "Spike Force", played: 3, won: 3, lost: 0, points: 6, diff: 32 },
+  { id: "s2", rank: 2, team: "Net Ninjas", played: 3, won: 2, lost: 1, points: 4, diff: 12 },
+  { id: "s3", rank: 3, team: "Beachside Bandits", played: 3, won: 1, lost: 2, points: 2, diff: -6 },
+  { id: "s4", rank: 4, team: "Sandstorm", played: 3, won: 0, lost: 3, points: 0, diff: -38 },
+  { id: "s5", rank: 1, team: "Grass Goblins", played: 3, won: 3, lost: 0, points: 6, diff: 28 },
+  { id: "s6", rank: 2, team: "Coastal Crushers", played: 3, won: 2, lost: 1, points: 4, diff: 9 },
+  { id: "s7", rank: 3, team: "Adelaide Aces", played: 3, won: 1, lost: 2, points: 2, diff: -4 },
+  { id: "s8", rank: 4, team: "Dune Dogs", played: 3, won: 0, lost: 3, points: 0, diff: -33 },
 ];
 
 export const statusLabel: Record<TournamentStatus, string> = {
   open: "Open",
-  full: "Full",
-  in_progress: "Live",
+  filled: "Filled",
   complete: "Complete",
 };
