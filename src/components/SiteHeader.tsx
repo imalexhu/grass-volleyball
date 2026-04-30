@@ -35,11 +35,11 @@ export function SiteHeader() {
           </Link>
           {user && (
             <Link
-              to="/admin"
+              to="/manage"
               className="px-3 py-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
               activeProps={{ className: "px-3 py-2 text-sm text-foreground" }}
             >
-              Admin
+              Manage
             </Link>
           )}
         </nav>

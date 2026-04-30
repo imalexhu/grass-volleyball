@@ -1,7 +1,7 @@
 import { createFileRoute, Outlet, Navigate } from "@tanstack/react-router";
 import { useAuth } from "@/contexts/AuthContext";
 
-export const Route = createFileRoute("/admin")({
+export const Route = createFileRoute("/manage")({
   component: AdminLayout,
 });
 

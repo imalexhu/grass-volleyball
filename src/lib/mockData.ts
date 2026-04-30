@@ -20,7 +20,7 @@ const sampleTeams = (n: number, prefix = "Team"): Team[] =>
 
 export const tournaments: Tournament[] = [
   {
-    id: "trn-1",
+    id: "trn-1", organizerId: "org-1",
     name: "Adelaide Summer Slam",
     dateStart: "2026-05-10",
     dateEnd: "2026-05-10",
@@ -33,7 +33,7 @@ export const tournaments: Tournament[] = [
     status: "open",
   },
   {
-    id: "trn-2",
+    id: "trn-2", organizerId: "org-1",
     name: "Autumn Open",
     dateStart: "2026-04-26",
     dateEnd: "2026-04-26",
@@ -46,7 +46,7 @@ export const tournaments: Tournament[] = [
     status: "filled",
   },
   {
-    id: "trn-3",
+    id: "trn-3", organizerId: "org-1",
     name: "City Showdown",
     dateStart: "2026-04-19",
     dateEnd: "2026-04-19",
@@ -59,7 +59,7 @@ export const tournaments: Tournament[] = [
     status: "filled",
   },
   {
-    id: "trn-4",
+    id: "trn-4", organizerId: "org-1",
     name: "Grass Roots Cup",
     dateStart: "2026-03-22",
     dateEnd: "2026-03-22",
@@ -72,7 +72,7 @@ export const tournaments: Tournament[] = [
     status: "complete",
   },
   {
-    id: "trn-5",
+    id: "trn-5", organizerId: "org-1",
     name: "Hills Classic",
     dateStart: "2026-03-08",
     dateEnd: "2026-03-08",
@@ -85,7 +85,7 @@ export const tournaments: Tournament[] = [
     status: "complete",
   },
   {
-    id: "trn-6",
+    id: "trn-6", organizerId: "org-1",
     name: "Winter Warm-up",
     dateStart: "2026-06-14",
     dateEnd: "2026-06-14",

@@ -63,7 +63,7 @@ export function QuickMatchDialog() {
       toast.success("Quick match started!");
       setOpen(false);
       reset();
-      navigate({ to: "/admin/score/$matchId", params: { matchId } });
+      navigate({ to: "/manage/score/$matchId", params: { matchId } });
     },
     onError: (error) => {
       console.error("Failed to start quick match:", error);

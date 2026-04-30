@@ -1,6 +1,6 @@
 import { collection, doc, getDocs, getDoc, addDoc, updateDoc, deleteDoc, query, where, orderBy, onSnapshot } from "firebase/firestore";
 import { db } from "./firebase";
-import type { Tournament, Match, Standing, Team, MatchEvent } from "./types";
+import type { Tournament, Match, Standing, Team, MatchEvent, VideoProcessingJob } from "./types";
 
 // Collections
 export const tournamentsCollection = collection(db, "tournaments");
@@ -245,6 +245,7 @@ export const createTestTournamentWithTeams = async (): Promise<string> => {
   }));
 
   const tournamentId = await createTournament({
+    organizerId: "org-1",
     name: "Test 8-Team Pro",
     dateStart: new Date().toISOString().split("T")[0],
     dateEnd: new Date().toISOString().split("T")[0],
@@ -277,6 +278,15 @@ export const getMatches = async (tournamentId?: string): Promise<Match[]> => {
   }
   const snapshot = await getDocs(q);
   return snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }) as Match);
+};
+
+export const getMatch = async (id: string): Promise<Match | null> => {
+  const docRef = doc(db, "matches", id);
+  const snapshot = await getDoc(docRef);
+  if (snapshot.exists()) {
+    return { id: snapshot.id, ...snapshot.data() } as Match;
+  }
+  return null;
 };
 
 export const getRunningMatches = async (): Promise<Match[]> => {
@@ -329,6 +339,11 @@ export const updateMatchLiveScore = async (
 export const updateMatchEvents = async (matchId: string, events: MatchEvent[]): Promise<void> => {
   const docRef = doc(db, "matches", matchId);
   await updateDoc(docRef, sanitizeData({ events }));
+};
+
+export const updateMatchVideoUrl = async (matchId: string, url: string): Promise<void> => {
+  const docRef = doc(db, "matches", matchId);
+  await updateDoc(docRef, { matchHighlightsUrl: url });
 };
 
 export const getStandings = async (tournamentId: string): Promise<Standing[]> => {
@@ -531,3 +546,69 @@ export const clearAllData = async (): Promise<void> => {
     await deleteDoc(document.ref);
   }
 };
+
+// ─── Video Processing Jobs ───────────────────────────────────────────────────
+
+const processingJobsCollection = collection(db, "processingJobs");
+
+/** Create a new processing job in Firestore and return its ID. */
+export const createProcessingJob = async (
+  matchId: string,
+  perspective: "A" | "B",
+  rawStoragePath: string
+): Promise<string> => {
+  const now = Date.now();
+  const job: Omit<VideoProcessingJob, "id"> = {
+    matchId,
+    perspective,
+    rawStoragePath,
+    status: "queued",
+    progress: 0,
+    createdAt: now,
+    updatedAt: now,
+  };
+  const docRef = await addDoc(processingJobsCollection, job);
+
+  // Also embed a reference on the match document for easy UI subscription
+  await updateDoc(doc(db, "matches", matchId), {
+    [`processingJob`]: { id: docRef.id, status: "queued", progress: 0, perspective },
+  });
+
+  return docRef.id;
+};
+
+/** Subscribe to real-time updates for a processing job. */
+export const subscribeToProcessingJob = (
+  jobId: string,
+  callback: (job: VideoProcessingJob) => void
+) => {
+  const docRef = doc(db, "processingJobs", jobId);
+  return onSnapshot(docRef, (snap) => {
+    if (snap.exists()) {
+      callback({ id: snap.id, ...snap.data() } as VideoProcessingJob);
+    }
+  });
+};
+
+/** Trigger the Cloud Run processor via HTTP POST. */
+export const triggerCloudRunProcessing = async (
+  jobId: string,
+  matchId: string,
+  perspective: "A" | "B",
+  rawStoragePath: string
+): Promise<void> => {
+  const url = import.meta.env.VITE_CLOUD_RUN_PROCESSOR_URL;
+  if (!url) throw new Error("VITE_CLOUD_RUN_PROCESSOR_URL is not set in .env");
+
+  const resp = await fetch(`${url}/process`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ jobId, matchId, perspective, rawStoragePath }),
+  });
+
+  if (!resp.ok) {
+    const text = await resp.text();
+    throw new Error(`Cloud Run error ${resp.status}: ${text}`);
+  }
+};
+

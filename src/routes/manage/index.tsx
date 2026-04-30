@@ -19,7 +19,7 @@ import { getMatches, getTournament } from "@/lib/api";
 import type { Match } from "@/lib/types";
 import { useNavigate } from "@tanstack/react-router";
 
-export const Route = createFileRoute("/admin/")({
+export const Route = createFileRoute("/manage/")({
   component: Admin,
   head: () => ({ meta: [{ title: "Admin — Adelaide Grass Volleyball" }] }),
 });
@@ -58,7 +58,7 @@ function Admin() {
     // 2. Secondary sort based on user selection
     let comparison = 0;
     if (sortConfig.field === "court") {
-      comparison = a.court - b.court;
+      comparison = (a.court ?? 0) - (b.court ?? 0);
     } else if (sortConfig.field === "status") {
       comparison = a.status.localeCompare(b.status);
     } else {
@@ -67,6 +67,9 @@ function Admin() {
 
     return sortConfig.direction === "asc" ? comparison : -comparison;
   });
+
+  const pendingMatches = sortedMatches.filter(m => m.status !== "complete");
+  const completedMatches = sortedMatches.filter(m => m.status === "complete");
 
   const seedMutation = useMutation({
     mutationFn: async () => {
@@ -156,7 +159,7 @@ function Admin() {
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-10">
         <div className="flex items-end justify-between mb-8">
           <div>
-            <div className="text-xs uppercase tracking-wider text-primary mb-1">Admin</div>
+            <div className="text-xs uppercase tracking-wider text-primary mb-1">Manage</div>
             <h1 className="text-3xl sm:text-4xl font-semibold tracking-tight">Dashboard</h1>
           </div>
           <div className="flex gap-2">
@@ -213,8 +216,8 @@ function Admin() {
                   ) : tournaments.length === 0 ? (
                     <tr><td colSpan={5} className="px-4 py-8 text-center text-muted-foreground text-sm">No tournaments found. Seed some data to get started.</td></tr>
                   ) : tournaments.map((t) => (
-                    <tr 
-                      key={t.id} 
+                    <tr
+                      key={t.id}
                       className="border-t border-border hover:bg-muted/30 transition-colors cursor-pointer group"
                       onClick={() => setActiveTournament(t)}
                     >
@@ -290,15 +293,15 @@ function Admin() {
             </div>
 
             <div className="flex items-center justify-between mb-3 mt-10">
-              <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">All Matches</h2>
-              <div className="text-[10px] text-muted-foreground font-bold bg-muted px-2 py-0.5 rounded uppercase tracking-widest">{allMatches.length} Total</div>
+              <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">Pending & Live Matches</h2>
+              <div className="text-[10px] text-muted-foreground font-bold bg-muted px-2 py-0.5 rounded uppercase tracking-widest">{pendingMatches.length} Total</div>
             </div>
             <div className="rounded-2xl border border-border bg-card overflow-hidden">
               <table className="w-full text-sm">
                 <thead className="bg-muted/50 text-xs uppercase text-muted-foreground">
                   <tr>
                     <th className="px-4 py-3 text-left">Match</th>
-                    <th 
+                    <th
                       className="px-4 py-3 text-left cursor-pointer hover:text-primary transition-colors"
                       onClick={() => toggleSort("court")}
                     >
@@ -310,7 +313,7 @@ function Admin() {
                       </div>
                     </th>
                     <th className="px-4 py-3 text-right">Score</th>
-                    <th 
+                    <th
                       className="px-4 py-3 text-right cursor-pointer hover:text-primary transition-colors"
                       onClick={() => toggleSort("status")}
                     >
@@ -327,11 +330,11 @@ function Admin() {
                 <tbody>
                   {isLoadingMatches ? (
                     <tr><td colSpan={5} className="px-4 py-8 text-center text-muted-foreground text-sm">Loading matches...</td></tr>
-                  ) : sortedMatches.length === 0 ? (
-                    <tr><td colSpan={5} className="px-4 py-8 text-center text-muted-foreground text-sm">No matches found.</td></tr>
-                  ) : sortedMatches.map((m) => (
-                    <tr 
-                      key={m.id} 
+                  ) : pendingMatches.length === 0 ? (
+                    <tr><td colSpan={5} className="px-4 py-8 text-center text-muted-foreground text-sm">No pending matches.</td></tr>
+                  ) : pendingMatches.map((m) => (
+                    <tr
+                      key={m.id}
                       className="border-t border-border hover:bg-muted/30 transition-colors cursor-pointer group"
                       onClick={() => {
                         const tournament = tournaments.find(t => t.id === m.tournamentId);
@@ -352,15 +355,10 @@ function Admin() {
                       </td>
                       <td className="px-4 py-3">Court {m.court}</td>
                       <td className="px-4 py-3 text-right tabular-nums">
-                        {m.status === "complete" ? (
-                          <div className="flex flex-col items-end">
-                            <span className="font-black text-primary">{m.scoreA} - {m.scoreB}</span>
-                            <span className="text-[9px] text-muted-foreground uppercase font-bold">Final</span>
-                          </div>
-                        ) : m.status === "live" ? (
+                        {m.status === "live" ? (
                           <div className="flex flex-col items-end">
                             <span className="font-black text-destructive animate-pulse">
-                              {m.events && m.events.length > 0 ? (m.events[m.events.length-1].scoreA) : 0} - {m.events && m.events.length > 0 ? (m.events[m.events.length-1].scoreB) : 0}
+                              {m.events && m.events.length > 0 ? (m.events[m.events.length - 1].scoreA) : 0} - {m.events && m.events.length > 0 ? (m.events[m.events.length - 1].scoreB) : 0}
                             </span>
                             <span className="text-[9px] text-destructive uppercase font-bold">Live Set</span>
                           </div>
@@ -374,7 +372,6 @@ function Admin() {
                             "inline-flex rounded-full border px-2 py-0.5 text-[10px] uppercase font-black tracking-widest",
                             m.status === "scheduled" && "border-border bg-muted text-muted-foreground",
                             m.status === "live" && "border-destructive/30 bg-destructive/10 text-destructive",
-                            m.status === "complete" && "border-success/30 bg-success/10 text-success",
                           )}
                         >
                           {m.status}
@@ -382,8 +379,73 @@ function Admin() {
                       </td>
                       <td className="px-4 py-3 text-right" onClick={(e) => e.stopPropagation()}>
                         <Button asChild size="sm" variant="ghost" className="h-8 group/btn">
-                          <Link to={`/admin/score/${m.id}`}>
+                          <Link to="/manage/score/$matchId" params={{ matchId: m.id }}>
                             Score <Zap className="ml-2 h-3 w-3 text-primary group-hover/btn:fill-primary" />
+                          </Link>
+                        </Button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="flex items-center justify-between mb-3 mt-10">
+              <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">Completed Matches</h2>
+              <div className="text-[10px] text-muted-foreground font-bold bg-muted px-2 py-0.5 rounded uppercase tracking-widest">{completedMatches.length} Total</div>
+            </div>
+            <div className="rounded-2xl border border-border bg-card overflow-hidden">
+              <table className="w-full text-sm">
+                <thead className="bg-muted/50 text-xs uppercase text-muted-foreground">
+                  <tr>
+                    <th className="px-4 py-3 text-left">Match</th>
+                    <th className="px-4 py-3 text-left">Court</th>
+                    <th className="px-4 py-3 text-right">Final Score</th>
+                    <th className="px-4 py-3 text-right">Status</th>
+                    <th className="px-4 py-3 text-right">Processing</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {isLoadingMatches ? (
+                    <tr><td colSpan={5} className="px-4 py-8 text-center text-muted-foreground text-sm">Loading matches...</td></tr>
+                  ) : completedMatches.length === 0 ? (
+                    <tr><td colSpan={5} className="px-4 py-8 text-center text-muted-foreground text-sm">No completed matches.</td></tr>
+                  ) : completedMatches.map((m) => (
+                    <tr
+                      key={m.id}
+                      className="border-t border-border hover:bg-muted/30 transition-colors cursor-pointer group"
+                      onClick={() => {
+                        const tournament = tournaments.find(t => t.id === m.tournamentId);
+                        if (tournament) {
+                          setActiveTournament(tournament);
+                        } else if (m.tournamentId) {
+                          getTournament(m.tournamentId).then(t => {
+                            if (t) setActiveTournament(t);
+                          });
+                        }
+                      }}
+                    >
+                      <td className="px-4 py-3 font-medium">
+                        <div className="flex flex-col">
+                          <span className="font-bold group-hover:text-primary transition-colors">{m.teamA} vs {m.teamB}</span>
+                          <span className="text-[10px] text-muted-foreground uppercase">{m.stage} {m.label ? `· ${m.label}` : ""}</span>
+                        </div>
+                      </td>
+                      <td className="px-4 py-3">Court {m.court}</td>
+                      <td className="px-4 py-3 text-right tabular-nums">
+                        <div className="flex flex-col items-end">
+                          <span className="font-black text-primary">{m.scoreA} - {m.scoreB}</span>
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        <span className="inline-flex rounded-full border px-2 py-0.5 text-[10px] uppercase font-black tracking-widest border-success/30 bg-success/10 text-success">
+                          {m.status}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-right" onClick={(e) => e.stopPropagation()}>
+                        <Button asChild size="sm" variant="outline" className="h-8 border-primary/20 bg-primary/5 hover:bg-primary/10 text-primary">
+                          <Link to="/manage/postmatch-process/$matchId" params={{ matchId: m.id }}>
+                            <Video className="mr-2 h-3 w-3" /> Post Match Processing
                           </Link>
                         </Button>
                       </td>
@@ -410,10 +472,10 @@ function Admin() {
           </div>
         </div>
       </div>
-      
-      <TournamentModal 
-        tournament={activeTournament} 
-        open={!!activeTournament} 
+
+      <TournamentModal
+        tournament={activeTournament}
+        open={!!activeTournament}
         onOpenChange={(v) => !v && setActiveTournament(null)}
         isAdmin={true}
       />

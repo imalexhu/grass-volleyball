@@ -9,20 +9,34 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as TosRouteImport } from './routes/tos'
 import { Route as RegisterRouteImport } from './routes/register'
+import { Route as PolicyRouteImport } from './routes/policy'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as HomeRouteImport } from './routes/home'
 import { Route as ForgotPasswordRouteImport } from './routes/forgot-password'
-import { Route as AdminRouteRouteImport } from './routes/admin/route'
+import { Route as ManageRouteRouteImport } from './routes/manage/route'
 import { Route as IndexRouteImport } from './routes/index'
-import { Route as AdminIndexRouteImport } from './routes/admin/index'
+import { Route as ManageIndexRouteImport } from './routes/manage/index'
+import { Route as MatchMatchIdRouteImport } from './routes/match.$matchId'
 import { Route as CheckoutSuccessRouteImport } from './routes/checkout.success'
 import { Route as CheckoutCancelRouteImport } from './routes/checkout.cancel'
-import { Route as AdminScoreMatchIdRouteImport } from './routes/admin/score/$matchId'
+import { Route as ManageScoreMatchIdRouteImport } from './routes/manage/score/$matchId'
+import { Route as ManagePostmatchProcessMatchIdRouteImport } from './routes/manage/postmatch-process/$matchId'
 
+const TosRoute = TosRouteImport.update({
+  id: '/tos',
+  path: '/tos',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const RegisterRoute = RegisterRouteImport.update({
   id: '/register',
   path: '/register',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PolicyRoute = PolicyRouteImport.update({
+  id: '/policy',
+  path: '/policy',
   getParentRoute: () => rootRouteImport,
 } as any)
 const LoginRoute = LoginRouteImport.update({
@@ -40,9 +54,9 @@ const ForgotPasswordRoute = ForgotPasswordRouteImport.update({
   path: '/forgot-password',
   getParentRoute: () => rootRouteImport,
 } as any)
-const AdminRouteRoute = AdminRouteRouteImport.update({
-  id: '/admin',
-  path: '/admin',
+const ManageRouteRoute = ManageRouteRouteImport.update({
+  id: '/manage',
+  path: '/manage',
   getParentRoute: () => rootRouteImport,
 } as any)
 const IndexRoute = IndexRouteImport.update({
@@ -50,10 +64,15 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
-const AdminIndexRoute = AdminIndexRouteImport.update({
+const ManageIndexRoute = ManageIndexRouteImport.update({
   id: '/',
   path: '/',
-  getParentRoute: () => AdminRouteRoute,
+  getParentRoute: () => ManageRouteRoute,
+} as any)
+const MatchMatchIdRoute = MatchMatchIdRouteImport.update({
+  id: '/match/$matchId',
+  path: '/match/$matchId',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const CheckoutSuccessRoute = CheckoutSuccessRouteImport.update({
   id: '/checkout/success',
@@ -65,104 +84,151 @@ const CheckoutCancelRoute = CheckoutCancelRouteImport.update({
   path: '/checkout/cancel',
   getParentRoute: () => rootRouteImport,
 } as any)
-const AdminScoreMatchIdRoute = AdminScoreMatchIdRouteImport.update({
+const ManageScoreMatchIdRoute = ManageScoreMatchIdRouteImport.update({
   id: '/score/$matchId',
   path: '/score/$matchId',
-  getParentRoute: () => AdminRouteRoute,
+  getParentRoute: () => ManageRouteRoute,
 } as any)
+const ManagePostmatchProcessMatchIdRoute =
+  ManagePostmatchProcessMatchIdRouteImport.update({
+    id: '/postmatch-process/$matchId',
+    path: '/postmatch-process/$matchId',
+    getParentRoute: () => ManageRouteRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
-  '/admin': typeof AdminRouteRouteWithChildren
+  '/manage': typeof ManageRouteRouteWithChildren
   '/forgot-password': typeof ForgotPasswordRoute
   '/home': typeof HomeRoute
   '/login': typeof LoginRoute
+  '/policy': typeof PolicyRoute
   '/register': typeof RegisterRoute
+  '/tos': typeof TosRoute
   '/checkout/cancel': typeof CheckoutCancelRoute
   '/checkout/success': typeof CheckoutSuccessRoute
-  '/admin/': typeof AdminIndexRoute
-  '/admin/score/$matchId': typeof AdminScoreMatchIdRoute
+  '/match/$matchId': typeof MatchMatchIdRoute
+  '/manage/': typeof ManageIndexRoute
+  '/manage/postmatch-process/$matchId': typeof ManagePostmatchProcessMatchIdRoute
+  '/manage/score/$matchId': typeof ManageScoreMatchIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/forgot-password': typeof ForgotPasswordRoute
   '/home': typeof HomeRoute
   '/login': typeof LoginRoute
+  '/policy': typeof PolicyRoute
   '/register': typeof RegisterRoute
+  '/tos': typeof TosRoute
   '/checkout/cancel': typeof CheckoutCancelRoute
   '/checkout/success': typeof CheckoutSuccessRoute
-  '/admin': typeof AdminIndexRoute
-  '/admin/score/$matchId': typeof AdminScoreMatchIdRoute
+  '/match/$matchId': typeof MatchMatchIdRoute
+  '/manage': typeof ManageIndexRoute
+  '/manage/postmatch-process/$matchId': typeof ManagePostmatchProcessMatchIdRoute
+  '/manage/score/$matchId': typeof ManageScoreMatchIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
-  '/admin': typeof AdminRouteRouteWithChildren
+  '/manage': typeof ManageRouteRouteWithChildren
   '/forgot-password': typeof ForgotPasswordRoute
   '/home': typeof HomeRoute
   '/login': typeof LoginRoute
+  '/policy': typeof PolicyRoute
   '/register': typeof RegisterRoute
+  '/tos': typeof TosRoute
   '/checkout/cancel': typeof CheckoutCancelRoute
   '/checkout/success': typeof CheckoutSuccessRoute
-  '/admin/': typeof AdminIndexRoute
-  '/admin/score/$matchId': typeof AdminScoreMatchIdRoute
+  '/match/$matchId': typeof MatchMatchIdRoute
+  '/manage/': typeof ManageIndexRoute
+  '/manage/postmatch-process/$matchId': typeof ManagePostmatchProcessMatchIdRoute
+  '/manage/score/$matchId': typeof ManageScoreMatchIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
-    | '/admin'
+    | '/manage'
     | '/forgot-password'
     | '/home'
     | '/login'
+    | '/policy'
     | '/register'
+    | '/tos'
     | '/checkout/cancel'
     | '/checkout/success'
-    | '/admin/'
-    | '/admin/score/$matchId'
+    | '/match/$matchId'
+    | '/manage/'
+    | '/manage/postmatch-process/$matchId'
+    | '/manage/score/$matchId'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/forgot-password'
     | '/home'
     | '/login'
+    | '/policy'
     | '/register'
+    | '/tos'
     | '/checkout/cancel'
     | '/checkout/success'
-    | '/admin'
-    | '/admin/score/$matchId'
+    | '/match/$matchId'
+    | '/manage'
+    | '/manage/postmatch-process/$matchId'
+    | '/manage/score/$matchId'
   id:
     | '__root__'
     | '/'
-    | '/admin'
+    | '/manage'
     | '/forgot-password'
     | '/home'
     | '/login'
+    | '/policy'
     | '/register'
+    | '/tos'
     | '/checkout/cancel'
     | '/checkout/success'
-    | '/admin/'
-    | '/admin/score/$matchId'
+    | '/match/$matchId'
+    | '/manage/'
+    | '/manage/postmatch-process/$matchId'
+    | '/manage/score/$matchId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
-  AdminRouteRoute: typeof AdminRouteRouteWithChildren
+  ManageRouteRoute: typeof ManageRouteRouteWithChildren
   ForgotPasswordRoute: typeof ForgotPasswordRoute
   HomeRoute: typeof HomeRoute
   LoginRoute: typeof LoginRoute
+  PolicyRoute: typeof PolicyRoute
   RegisterRoute: typeof RegisterRoute
+  TosRoute: typeof TosRoute
   CheckoutCancelRoute: typeof CheckoutCancelRoute
   CheckoutSuccessRoute: typeof CheckoutSuccessRoute
+  MatchMatchIdRoute: typeof MatchMatchIdRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/tos': {
+      id: '/tos'
+      path: '/tos'
+      fullPath: '/tos'
+      preLoaderRoute: typeof TosRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/register': {
       id: '/register'
       path: '/register'
       fullPath: '/register'
       preLoaderRoute: typeof RegisterRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/policy': {
+      id: '/policy'
+      path: '/policy'
+      fullPath: '/policy'
+      preLoaderRoute: typeof PolicyRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/login': {
@@ -186,11 +252,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ForgotPasswordRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/admin': {
-      id: '/admin'
-      path: '/admin'
-      fullPath: '/admin'
-      preLoaderRoute: typeof AdminRouteRouteImport
+    '/manage': {
+      id: '/manage'
+      path: '/manage'
+      fullPath: '/manage'
+      preLoaderRoute: typeof ManageRouteRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/': {
@@ -200,12 +266,19 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/admin/': {
-      id: '/admin/'
+    '/manage/': {
+      id: '/manage/'
       path: '/'
-      fullPath: '/admin/'
-      preLoaderRoute: typeof AdminIndexRouteImport
-      parentRoute: typeof AdminRouteRoute
+      fullPath: '/manage/'
+      preLoaderRoute: typeof ManageIndexRouteImport
+      parentRoute: typeof ManageRouteRoute
+    }
+    '/match/$matchId': {
+      id: '/match/$matchId'
+      path: '/match/$matchId'
+      fullPath: '/match/$matchId'
+      preLoaderRoute: typeof MatchMatchIdRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/checkout/success': {
       id: '/checkout/success'
@@ -221,39 +294,51 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CheckoutCancelRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/admin/score/$matchId': {
-      id: '/admin/score/$matchId'
+    '/manage/score/$matchId': {
+      id: '/manage/score/$matchId'
       path: '/score/$matchId'
-      fullPath: '/admin/score/$matchId'
-      preLoaderRoute: typeof AdminScoreMatchIdRouteImport
-      parentRoute: typeof AdminRouteRoute
+      fullPath: '/manage/score/$matchId'
+      preLoaderRoute: typeof ManageScoreMatchIdRouteImport
+      parentRoute: typeof ManageRouteRoute
+    }
+    '/manage/postmatch-process/$matchId': {
+      id: '/manage/postmatch-process/$matchId'
+      path: '/postmatch-process/$matchId'
+      fullPath: '/manage/postmatch-process/$matchId'
+      preLoaderRoute: typeof ManagePostmatchProcessMatchIdRouteImport
+      parentRoute: typeof ManageRouteRoute
     }
   }
 }
 
-interface AdminRouteRouteChildren {
-  AdminIndexRoute: typeof AdminIndexRoute
-  AdminScoreMatchIdRoute: typeof AdminScoreMatchIdRoute
+interface ManageRouteRouteChildren {
+  ManageIndexRoute: typeof ManageIndexRoute
+  ManagePostmatchProcessMatchIdRoute: typeof ManagePostmatchProcessMatchIdRoute
+  ManageScoreMatchIdRoute: typeof ManageScoreMatchIdRoute
 }
 
-const AdminRouteRouteChildren: AdminRouteRouteChildren = {
-  AdminIndexRoute: AdminIndexRoute,
-  AdminScoreMatchIdRoute: AdminScoreMatchIdRoute,
+const ManageRouteRouteChildren: ManageRouteRouteChildren = {
+  ManageIndexRoute: ManageIndexRoute,
+  ManagePostmatchProcessMatchIdRoute: ManagePostmatchProcessMatchIdRoute,
+  ManageScoreMatchIdRoute: ManageScoreMatchIdRoute,
 }
 
-const AdminRouteRouteWithChildren = AdminRouteRoute._addFileChildren(
-  AdminRouteRouteChildren,
+const ManageRouteRouteWithChildren = ManageRouteRoute._addFileChildren(
+  ManageRouteRouteChildren,
 )
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
-  AdminRouteRoute: AdminRouteRouteWithChildren,
+  ManageRouteRoute: ManageRouteRouteWithChildren,
   ForgotPasswordRoute: ForgotPasswordRoute,
   HomeRoute: HomeRoute,
   LoginRoute: LoginRoute,
+  PolicyRoute: PolicyRoute,
   RegisterRoute: RegisterRoute,
+  TosRoute: TosRoute,
   CheckoutCancelRoute: CheckoutCancelRoute,
   CheckoutSuccessRoute: CheckoutSuccessRoute,
+  MatchMatchIdRoute: MatchMatchIdRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

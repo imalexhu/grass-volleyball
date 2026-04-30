@@ -78,6 +78,7 @@ export function CreateTournamentDialog() {
     mutationFn: (data: TournamentFormValues) => {
       return createTournament({
         ...data,
+        organizerId: "org-1", // TODO: Use real user ID
         dateStart: data.dateStart.toISOString(),
         dateEnd: data.dateEnd.toISOString(),
         description: data.description || "",

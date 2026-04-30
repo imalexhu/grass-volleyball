@@ -68,12 +68,12 @@ function Landing() {
             </p>
 
             <div className="mt-10 flex flex-wrap items-center justify-center gap-4">
-              <Button asChild size="xl" className="bg-primary text-primary-foreground hover:bg-primary-glow shadow-glow-sm h-14 px-8 rounded-2xl text-lg font-bold">
+              <Button asChild size="lg" className="bg-primary text-primary-foreground hover:bg-primary-glow shadow-glow-sm h-14 px-8 rounded-2xl text-lg font-bold">
                 <Link to="/home">
                   Find a Tournament <ArrowRight className="ml-2 h-5 w-5" />
                 </Link>
               </Button>
-              <Button asChild size="xl" variant="outline" className="h-14 px-8 rounded-2xl text-lg font-bold border-border bg-card/40 backdrop-blur-sm">
+              <Button asChild size="lg" variant="outline" className="h-14 px-8 rounded-2xl text-lg font-bold border-border bg-card/40 backdrop-blur-sm">
                 <Link to="/register">Join the Club</Link>
               </Button>
             </div>
@@ -96,9 +96,11 @@ function Landing() {
           
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
             {liveMatches.map((m) => (
-              <div 
+              <Link 
                 key={m.id} 
-                className="group relative overflow-hidden rounded-[32px] border border-border bg-card/40 backdrop-blur-xl shadow-2xl transition-all hover:border-primary/40 hover:bg-card/60"
+                to="/match/$matchId"
+                params={{ matchId: m.id }}
+                className="group relative block overflow-hidden rounded-[32px] border border-border bg-card/40 backdrop-blur-xl shadow-2xl transition-all hover:border-primary/40 hover:bg-card/60"
               >
                 <div className="absolute inset-0 bg-gradient-to-br from-primary/10 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
                 
@@ -173,7 +175,7 @@ function Landing() {
                       style={{ width: `${Math.min(100, ((m.currentSetScoreA || 0) + (m.currentSetScoreB || 0)) * 4)}%` }}
                     />
                 </div>
-              </div>
+              </Link>
             ))}
           </div>
         </section>
@@ -240,6 +242,8 @@ function Landing() {
              <Link to="/home" className="hover:text-primary transition-colors">Tournaments</Link>
              <Link to="/login" className="hover:text-primary transition-colors">Login</Link>
              <Link to="/register" className="hover:text-primary transition-colors">Join</Link>
+             <Link to="/policy" className="hover:text-primary transition-colors">Privacy</Link>
+             <Link to="/tos" className="hover:text-primary transition-colors">Terms</Link>
           </div>
         </div>
       </footer>

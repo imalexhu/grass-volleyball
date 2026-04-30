@@ -227,16 +227,27 @@ export function TournamentModal({
                   return (
                     <Link 
                       key={m.id} 
-                      to="/admin/score/$matchId" 
+                      to="/manage/score/$matchId" 
                       params={{ matchId: m.id }}
                       className="block no-underline"
+                      onClick={() => onOpenChange(false)}
                     >
                       {MatchContent}
                     </Link>
                   );
                 }
 
-                return <div key={m.id}>{MatchContent}</div>;
+                return (
+                  <Link 
+                    key={m.id} 
+                    to="/match/$matchId" 
+                    params={{ matchId: m.id }}
+                    className="block no-underline"
+                    onClick={() => onOpenChange(false)}
+                  >
+                    {MatchContent}
+                  </Link>
+                );
               })}
               {filteredMatches.length === 0 && (
                 <div className="p-8 text-center text-muted-foreground italic border border-dashed rounded-lg">
