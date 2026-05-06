@@ -7,7 +7,16 @@ import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { Checkbox } from "@/components/ui/checkbox";
-import { startMatch, subscribeToMatch, updateMatchResult, updateMatchLiveScore, updateMatchEvents } from "@/lib/api";
+import { startMatch, subscribeToMatch, updateMatchResult, updateMatchLiveScore, updateMatchEvents, getTournament } from "@/lib/api";
+import type { Tournament } from "@/lib/types";
+import {
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbList,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
+} from "@/components/ui/breadcrumb";
 
 export const Route = createFileRoute("/manage/score/$matchId")({
   component: ScorePad,
@@ -18,6 +27,7 @@ function ScorePad() {
   const { matchId } = Route.useParams();
   const navigate = useNavigate();
   const [match, setMatch] = useState<Match | null>(null);
+  const [tournament, setTournament] = useState<Tournament | null>(null);
   const [events, setEvents] = useState<MatchEvent[]>([]);
   const [setHistory, setSetHistory] = useState<{ A: number, B: number }[]>([]);
   const [setNumber, setSetNumber] = useState(1);
@@ -29,8 +39,12 @@ function ScorePad() {
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    return subscribeToMatch(matchId, (m) => {
+    return subscribeToMatch(matchId, async (m) => {
       setMatch(m);
+      if (m?.tournamentId && !tournament) {
+        const t = await getTournament(m.tournamentId);
+        if (t) setTournament(t);
+      }
       if (m.vodUrlA) setVodUrlA(m.vodUrlA);
       if (m.vodUrlB) setVodUrlB(m.vodUrlB);
       if (m.matchHighlightsUrl) setMatchHighlightsUrl(m.matchHighlightsUrl);
@@ -289,15 +303,23 @@ return (
 
     {/* Header */}
     <header className="flex items-center justify-between px-4 py-4 border-b border-border/50 bg-background/80 backdrop-blur-xl sticky top-0 z-20">
-      <Link
-        to="/manage"
-        className="flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors group"
-      >
-        <div className="p-1.5 rounded-lg group-hover:bg-muted transition-colors">
-          <ArrowLeft className="h-4 w-4" />
-        </div>
-        Exit
-      </Link>
+      <Breadcrumb className="text-xs sm:text-sm">
+        <BreadcrumbList>
+          <BreadcrumbItem>
+            <BreadcrumbLink asChild>
+              <Link to="/manage">Dashboard</Link>
+            </BreadcrumbLink>
+          </BreadcrumbItem>
+          {tournament && (
+            <>
+              <BreadcrumbSeparator />
+              <BreadcrumbItem className="hidden sm:block">
+                <BreadcrumbPage>{tournament.name}</BreadcrumbPage>
+              </BreadcrumbItem>
+            </>
+          )}
+        </BreadcrumbList>
+      </Breadcrumb>
       <div className="flex flex-col items-center">
         <div className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground font-semibold mb-0.5">
           Court {match.court}

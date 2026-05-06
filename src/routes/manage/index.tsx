@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { SiteHeader } from "@/components/SiteHeader";
+
 import { tournaments as mockTournaments } from "@/lib/mockData";
 import { getTournaments, createTournament, clearAllData } from "@/lib/api";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -11,13 +11,15 @@ import { CreateTournamentDialog } from "@/components/CreateTournamentDialog";
 import { EditTournamentDialog } from "@/components/EditTournamentDialog";
 import { deleteTournament, createFixtures, createTestTournamentWithTeams, completeTournament } from "@/lib/api";
 import { statusLabel, type Tournament } from "@/lib/types";
-import { Loader2, Zap } from "lucide-react";
+import { Loader2, Zap, Calendar as CalendarIcon, FileX, Volleyball } from "lucide-react";
 import { TournamentModal } from "@/components/TournamentModal";
 import { useState } from "react";
+import { Skeleton } from "@/components/ui/skeleton";
 import { QuickMatchDialog } from "@/components/QuickMatchDialog";
 import { getMatches, getTournament } from "@/lib/api";
 import type { Match } from "@/lib/types";
 import { useNavigate } from "@tanstack/react-router";
+import { useAuth } from "@/contexts/AuthContext";
 
 export const Route = createFileRoute("/manage/")({
   component: Admin,
@@ -28,14 +30,60 @@ function Admin() {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const [activeTournament, setActiveTournament] = useState<Tournament | null>(null);
-  const { data: tournaments = [], isLoading } = useQuery({
+  const { userProfile } = useAuth();
+  const isAdmin = userProfile?.role === "admin";
+  const isOrg = userProfile?.role === "organization";
+
+  const { data: rawTournaments = [], isLoading } = useQuery({
     queryKey: ["tournaments"],
     queryFn: getTournaments,
   });
 
-  const { data: allMatches = [], isLoading: isLoadingMatches } = useQuery({
+  const tournaments = rawTournaments.filter(t => {
+    if (isAdmin) return true;
+    if (isOrg) return t.organizerId === userProfile.id;
+    return false; // players shouldn't really be here, but just in case
+  });
+
+  const { data: rawMatches = [], isLoading: isLoadingMatches } = useQuery({
     queryKey: ["all-matches"],
     queryFn: () => getMatches(),
+  });
+
+  if (!isLoading && !isLoadingMatches && userProfile && userProfile.role === "player") {
+    return (
+      <div className="flex-1 flex items-center justify-center min-h-[60vh]">
+        <div className="text-center max-w-md px-6">
+          <div className="bg-primary/10 w-16 h-16 rounded-3xl flex items-center justify-center mx-auto mb-6">
+            <Users className="h-8 w-8 text-primary" />
+          </div>
+          <h2 className="text-2xl font-bold tracking-tight">Access Restricted</h2>
+          <p className="text-muted-foreground mt-3 leading-relaxed">
+            Your account is currently set to <strong>Player</strong>. Only Organization or Administrator accounts can manage tournaments and matches.
+          </p>
+          <div className="mt-8 flex flex-col gap-3">
+            <Button asChild variant="outline">
+              <Link to="/">Return to Home</Link>
+            </Button>
+            <p className="text-[10px] text-muted-foreground uppercase tracking-widest mt-4">
+              Contact an administrator to upgrade your role.
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  const allMatches = rawMatches.filter(m => {
+    if (isAdmin) return true;
+    if (isOrg) {
+      if (m.organizerId === userProfile.id) return true;
+      if (m.tournamentId) {
+        return tournaments.some(t => t.id === m.tournamentId);
+      }
+      return false;
+    }
+    return false;
   });
 
   const [sortConfig, setSortConfig] = useState<{ field: "court" | "status" | "scheduledAt", direction: "asc" | "desc" }>({
@@ -62,25 +110,35 @@ function Admin() {
     } else if (sortConfig.field === "status") {
       comparison = a.status.localeCompare(b.status);
     } else {
-      comparison = new Date(a.scheduledAt).getTime() - new Date(b.scheduledAt).getTime();
+      const timeA = new Date(a.scheduledAt).getTime();
+      const timeB = new Date(b.scheduledAt).getTime();
+      
+      if (isNaN(timeA) && isNaN(timeB)) comparison = 0;
+      else if (isNaN(timeA)) comparison = 1;
+      else if (isNaN(timeB)) comparison = -1;
+      else comparison = timeA - timeB;
     }
 
     return sortConfig.direction === "asc" ? comparison : -comparison;
   });
+
+  const filteredOutCount = rawMatches.length - allMatches.length;
 
   const pendingMatches = sortedMatches.filter(m => m.status !== "complete");
   const completedMatches = sortedMatches.filter(m => m.status === "complete");
 
   const seedMutation = useMutation({
     mutationFn: async () => {
+      if (!userProfile) throw new Error("Must be logged in to seed data");
       // Seed tournaments
       for (const t of mockTournaments) {
         const { id, ...data } = t;
-        await createTournament(data);
+        await createTournament({ ...data, organizerId: userProfile.id });
       }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["tournaments"] });
+      queryClient.invalidateQueries({ queryKey: ["all-matches"] });
       toast.success("Successfully seeded mock data to Firestore");
     },
     onError: (error) => {
@@ -93,6 +151,7 @@ function Admin() {
     mutationFn: clearAllData,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["tournaments"] });
+      queryClient.invalidateQueries({ queryKey: ["all-matches"] });
       toast.success("Successfully cleared all data from Firestore");
     },
     onError: (error) => {
@@ -105,6 +164,7 @@ function Admin() {
     mutationFn: deleteTournament,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["tournaments"] });
+      queryClient.invalidateQueries({ queryKey: ["all-matches"] });
       toast.success("Tournament deleted");
     },
     onError: (error) => {
@@ -117,6 +177,7 @@ function Admin() {
     mutationFn: createFixtures,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["tournaments"] });
+      queryClient.invalidateQueries({ queryKey: ["all-matches"] });
       toast.success("Fixtures generated and matches created!");
     },
     onError: (error: any) => {
@@ -126,9 +187,10 @@ function Admin() {
   });
 
   const testFixtureMutation = useMutation({
-    mutationFn: createTestTournamentWithTeams,
+    mutationFn: () => createTestTournamentWithTeams(userProfile?.id),
     onSuccess: (id) => {
       queryClient.invalidateQueries({ queryKey: ["tournaments"] });
+      queryClient.invalidateQueries({ queryKey: ["all-matches"] });
       toast.success("Created test tournament with 8 teams!");
     },
     onError: (error) => {
@@ -153,37 +215,42 @@ function Admin() {
   const teams = tournaments.reduce((s, t) => s + (t.registeredTeams?.length || 0), 0);
 
   return (
-    <div className="min-h-screen">
-      <SiteHeader />
+    <div className="flex-1 w-full">
 
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-10">
         <div className="flex items-end justify-between mb-8">
           <div>
             <div className="text-xs uppercase tracking-wider text-primary mb-1">Manage</div>
-            <h1 className="text-3xl sm:text-4xl font-semibold tracking-tight">Dashboard</h1>
+            <h1 className="text-3xl sm:text-4xl font-semibold tracking-tight">
+              {isOrg ? "Organization Dashboard" : "Global Dashboard"}
+            </h1>
           </div>
           <div className="flex gap-2">
-            <Button
-              variant="outline"
-              className="text-destructive hover:text-destructive border-border hover:bg-destructive/10"
-              onClick={() => {
-                if (window.confirm("Are you sure you want to clear all data? This cannot be undone.")) {
-                  clearMutation.mutate();
-                }
-              }}
-              disabled={clearMutation.isPending || isLoading}
-            >
-              <Trash2 className="h-4 w-4 mr-2" />
-              {clearMutation.isPending ? "Clearing..." : "Clear Data"}
-            </Button>
-            <Button
-              variant="outline"
-              onClick={() => seedMutation.mutate()}
-              disabled={seedMutation.isPending}
-            >
-              <Database className="h-4 w-4 mr-2" />
-              {seedMutation.isPending ? "Seeding..." : "Seed Data"}
-            </Button>
+            {isAdmin && (
+              <>
+                <Button
+                  variant="outline"
+                  className="text-destructive hover:text-destructive border-border hover:bg-destructive/10"
+                  onClick={() => {
+                    if (window.confirm("Are you sure you want to clear all data? This cannot be undone.")) {
+                      clearMutation.mutate();
+                    }
+                  }}
+                  disabled={clearMutation.isPending || isLoading}
+                >
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  {clearMutation.isPending ? "Clearing..." : "Clear Data"}
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => seedMutation.mutate()}
+                  disabled={seedMutation.isPending}
+                >
+                  <Database className="h-4 w-4 mr-2" />
+                  {seedMutation.isPending ? "Seeding..." : "Seed Data"}
+                </Button>
+              </>
+            )}
             <CreateTournamentDialog />
           </div>
         </div>
@@ -191,7 +258,7 @@ function Admin() {
         <div className="grid sm:grid-cols-3 gap-4 mb-8">
           <Stat icon={Calendar} label="Open registrations" value={open} />
           <Stat icon={Users} label="Total registered teams" value={teams} />
-          <Stat icon={Video} label="VOD jobs pending" value={2} />
+          <Stat icon={Video} label="VOD jobs pending" value={0} />
         </div>
 
         <div className="grid lg:grid-cols-3 gap-6">
@@ -212,9 +279,25 @@ function Admin() {
                 </thead>
                 <tbody>
                   {isLoading ? (
-                    <tr><td colSpan={5} className="px-4 py-8 text-center text-muted-foreground text-sm">Loading...</td></tr>
+                    Array.from({ length: 3 }).map((_, i) => (
+                      <tr key={i} className="border-t border-border">
+                        <td className="px-4 py-3"><Skeleton className="h-5 w-32" /></td>
+                        <td className="px-4 py-3"><Skeleton className="h-5 w-24" /></td>
+                        <td className="px-4 py-3 text-right"><Skeleton className="h-5 w-12 ml-auto" /></td>
+                        <td className="px-4 py-3 text-right"><Skeleton className="h-6 w-16 ml-auto rounded-full" /></td>
+                        <td className="px-4 py-3"><Skeleton className="h-8 w-24 ml-auto" /></td>
+                      </tr>
+                    ))
                   ) : tournaments.length === 0 ? (
-                    <tr><td colSpan={5} className="px-4 py-8 text-center text-muted-foreground text-sm">No tournaments found. Seed some data to get started.</td></tr>
+                    <tr>
+                      <td colSpan={5} className="px-4 py-12 text-center">
+                        <div className="flex flex-col items-center justify-center text-muted-foreground">
+                          <CalendarIcon className="h-8 w-8 mb-3 text-muted-foreground/50" />
+                          <p className="text-sm font-medium">No tournaments found</p>
+                          <p className="text-xs mt-1">Seed some data or create a new tournament to get started.</p>
+                        </div>
+                      </td>
+                    </tr>
                   ) : tournaments.map((t) => (
                     <tr
                       key={t.id}
@@ -329,9 +412,30 @@ function Admin() {
                 </thead>
                 <tbody>
                   {isLoadingMatches ? (
-                    <tr><td colSpan={5} className="px-4 py-8 text-center text-muted-foreground text-sm">Loading matches...</td></tr>
+                    Array.from({ length: 3 }).map((_, i) => (
+                      <tr key={i} className="border-t border-border">
+                        <td className="px-4 py-3"><Skeleton className="h-8 w-40" /></td>
+                        <td className="px-4 py-3"><Skeleton className="h-5 w-16" /></td>
+                        <td className="px-4 py-3"><Skeleton className="h-8 w-20 ml-auto" /></td>
+                        <td className="px-4 py-3"><Skeleton className="h-6 w-16 ml-auto rounded-full" /></td>
+                        <td className="px-4 py-3"><Skeleton className="h-8 w-20 ml-auto" /></td>
+                      </tr>
+                    ))
                   ) : pendingMatches.length === 0 ? (
-                    <tr><td colSpan={5} className="px-4 py-8 text-center text-muted-foreground text-sm">No pending matches.</td></tr>
+                    <tr>
+                      <td colSpan={5} className="px-4 py-12 text-center">
+                        <div className="flex flex-col items-center justify-center text-muted-foreground">
+                          <Volleyball className="h-8 w-8 mb-3 text-muted-foreground/50" />
+                          <p className="text-sm font-medium">No pending matches</p>
+                          <p className="text-xs mt-1">Generate fixtures from a filled tournament.</p>
+                          {isOrg && filteredOutCount > 0 && (
+                            <p className="text-[10px] mt-4 text-muted-foreground italic bg-muted/50 px-3 py-2 rounded-lg border border-border/50">
+                              Tip: {filteredOutCount} matches exist but are assigned to other organizations or have no organizer set.
+                            </p>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
                   ) : pendingMatches.map((m) => (
                     <tr
                       key={m.id}
@@ -349,7 +453,11 @@ function Admin() {
                     >
                       <td className="px-4 py-3 font-medium">
                         <div className="flex flex-col">
-                          <span className="font-bold group-hover:text-primary transition-colors">{m.teamA} vs {m.teamB}</span>
+                          <span className="font-bold flex items-center gap-1.5">
+                            <Link to="/team/$teamId" params={{ teamId: m.teamA }} onClick={e => e.stopPropagation()} className="hover:text-primary hover:underline transition-colors">{m.teamA}</Link>
+                            <span className="text-muted-foreground font-normal text-xs mx-0.5">vs</span>
+                            <Link to="/team/$teamId" params={{ teamId: m.teamB }} onClick={e => e.stopPropagation()} className="hover:text-primary hover:underline transition-colors">{m.teamB}</Link>
+                          </span>
                           <span className="text-[10px] text-muted-foreground uppercase">{m.stage} {m.label ? `· ${m.label}` : ""}</span>
                         </div>
                       </td>
@@ -407,9 +515,25 @@ function Admin() {
                 </thead>
                 <tbody>
                   {isLoadingMatches ? (
-                    <tr><td colSpan={5} className="px-4 py-8 text-center text-muted-foreground text-sm">Loading matches...</td></tr>
+                    Array.from({ length: 3 }).map((_, i) => (
+                      <tr key={i} className="border-t border-border">
+                        <td className="px-4 py-3"><Skeleton className="h-8 w-40" /></td>
+                        <td className="px-4 py-3"><Skeleton className="h-5 w-16" /></td>
+                        <td className="px-4 py-3"><Skeleton className="h-6 w-16 ml-auto" /></td>
+                        <td className="px-4 py-3"><Skeleton className="h-6 w-16 ml-auto rounded-full" /></td>
+                        <td className="px-4 py-3"><Skeleton className="h-8 w-32 ml-auto" /></td>
+                      </tr>
+                    ))
                   ) : completedMatches.length === 0 ? (
-                    <tr><td colSpan={5} className="px-4 py-8 text-center text-muted-foreground text-sm">No completed matches.</td></tr>
+                    <tr>
+                      <td colSpan={5} className="px-4 py-12 text-center">
+                        <div className="flex flex-col items-center justify-center text-muted-foreground">
+                          <FileX className="h-8 w-8 mb-3 text-muted-foreground/50" />
+                          <p className="text-sm font-medium">No completed matches</p>
+                          <p className="text-xs mt-1">Finish a live match to see it here.</p>
+                        </div>
+                      </td>
+                    </tr>
                   ) : completedMatches.map((m) => (
                     <tr
                       key={m.id}
@@ -427,7 +551,11 @@ function Admin() {
                     >
                       <td className="px-4 py-3 font-medium">
                         <div className="flex flex-col">
-                          <span className="font-bold group-hover:text-primary transition-colors">{m.teamA} vs {m.teamB}</span>
+                          <span className="font-bold flex items-center gap-1.5">
+                            <Link to="/team/$teamId" params={{ teamId: m.teamA }} onClick={e => e.stopPropagation()} className="hover:text-primary hover:underline transition-colors">{m.teamA}</Link>
+                            <span className="text-muted-foreground font-normal text-xs mx-0.5">vs</span>
+                            <Link to="/team/$teamId" params={{ teamId: m.teamB }} onClick={e => e.stopPropagation()} className="hover:text-primary hover:underline transition-colors">{m.teamB}</Link>
+                          </span>
                           <span className="text-[10px] text-muted-foreground uppercase">{m.stage} {m.label ? `· ${m.label}` : ""}</span>
                         </div>
                       </td>
@@ -460,13 +588,20 @@ function Admin() {
             <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground mb-3">Quick actions</h2>
             <div className="space-y-2">
               <QuickMatchDialog />
-              <Action
-                icon={Zap}
-                label="Quick Test: 8-Team Fixture"
-                onClick={() => testFixtureMutation.mutate()}
-                loading={testFixtureMutation.isPending}
-              />
-              <Action icon={Users} label="Manage users" />
+              {isAdmin && (
+                <>
+                  <Action
+                    icon={Zap}
+                    label="Quick Test: 8-Team Fixture"
+                    onClick={() => testFixtureMutation.mutate()}
+                    loading={testFixtureMutation.isPending}
+                  />
+                  <Action icon={Users} label="Manage users" />
+                </>
+              )}
+              {isOrg && (
+                <Action icon={Users} label="Organization Profile" onClick={() => navigate({ to: "/org/$orgId", params: { orgId: userProfile?.id || "unknown" } })} />
+              )}
               <Action icon={Video} label="VOD pipeline" />
             </div>
           </div>

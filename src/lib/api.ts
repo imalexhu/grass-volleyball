@@ -1,8 +1,9 @@
-import { collection, doc, getDocs, getDoc, addDoc, updateDoc, deleteDoc, query, where, orderBy, onSnapshot } from "firebase/firestore";
+import { collection, doc, getDocs, getDoc, setDoc, addDoc, updateDoc, deleteDoc, query, where, orderBy, onSnapshot, writeBatch } from "firebase/firestore";
 import { db } from "./firebase";
-import type { Tournament, Match, Standing, Team, MatchEvent, VideoProcessingJob } from "./types";
+import type { Tournament, Match, Standing, Team, MatchEvent, VideoProcessingJob, UserProfile } from "./types";
 
 // Collections
+export const usersCollection = collection(db, "users");
 export const tournamentsCollection = collection(db, "tournaments");
 export const matchesCollection = collection(db, "matches");
 export const standingsCollection = collection(db, "standings");
@@ -21,6 +22,21 @@ export const getTournament = async (id: string): Promise<Tournament | null> => {
     return { id: snapshot.id, ...snapshot.data() } as Tournament;
   }
   return null;
+};
+
+// Users
+export const getUserProfile = async (id: string): Promise<UserProfile | null> => {
+  const docRef = doc(db, "users", id);
+  const snapshot = await getDoc(docRef);
+  if (snapshot.exists()) {
+    return { id: snapshot.id, ...snapshot.data() } as UserProfile;
+  }
+  return null;
+};
+
+export const createUserProfile = async (profile: UserProfile): Promise<void> => {
+  const docRef = doc(db, "users", profile.id);
+  await setDoc(docRef, sanitizeData(profile));
 };
 
 // Helper to strip undefined values for Firestore
@@ -49,8 +65,27 @@ export const updateTournament = async (id: string, data: Partial<Tournament>): P
 };
 
 export const deleteTournament = async (id: string): Promise<void> => {
-  const docRef = doc(db, "tournaments", id);
-  await deleteDoc(docRef);
+  const batch = writeBatch(db);
+
+  // 1. Delete all matches associated with this tournament
+  const matchesQ = query(matchesCollection, where("tournamentId", "==", id));
+  const matchesSnapshot = await getDocs(matchesQ);
+  matchesSnapshot.docs.forEach((doc) => {
+    batch.delete(doc.ref);
+  });
+
+  // 2. Delete all standings associated with this tournament
+  const standingsQ = query(standingsCollection, where("tournamentId", "==", id));
+  const standingsSnapshot = await getDocs(standingsQ);
+  standingsSnapshot.docs.forEach((doc) => {
+    batch.delete(doc.ref);
+  });
+
+  // 3. Delete the tournament itself
+  const tournamentRef = doc(db, "tournaments", id);
+  batch.delete(tournamentRef);
+
+  await batch.commit();
 };
 
 export const registerTeamToTournament = async (tournamentId: string, team: Team): Promise<void> => {
@@ -118,6 +153,7 @@ export const createFixtures = async (tournamentId: string): Promise<void> => {
       // Pool A
       matches.push({
         tournamentId,
+        organizerId: tournament.organizerId,
         stage: "pool",
         pool: "A",
         teamA: poolA[pair[0]].name,
@@ -129,6 +165,7 @@ export const createFixtures = async (tournamentId: string): Promise<void> => {
       // Pool B
       matches.push({
         tournamentId,
+        organizerId: tournament.organizerId,
         stage: "pool",
         pool: "B",
         teamA: poolB[pair[0]].name,
@@ -152,6 +189,7 @@ export const createFixtures = async (tournamentId: string): Promise<void> => {
     placementPairs.forEach((p, i) => {
       matches.push({
         tournamentId,
+        organizerId: tournament.organizerId,
         stage: "placement",
         teamA: p.a,
         teamB: p.b,
@@ -166,6 +204,7 @@ export const createFixtures = async (tournamentId: string): Promise<void> => {
     const semiTime = addTime(45);
     matches.push({
       tournamentId,
+      organizerId: tournament.organizerId,
       stage: "placement",
       teamA: "Winner of QF1",
       teamB: "Winner of QF4",
@@ -176,6 +215,7 @@ export const createFixtures = async (tournamentId: string): Promise<void> => {
     });
     matches.push({
       tournamentId,
+      organizerId: tournament.organizerId,
       stage: "placement",
       teamA: "Winner of QF2",
       teamB: "Winner of QF3",
@@ -189,6 +229,7 @@ export const createFixtures = async (tournamentId: string): Promise<void> => {
     const finalTime = addTime(45);
     matches.push({
       tournamentId,
+      organizerId: tournament.organizerId,
       stage: "final",
       teamA: "Winner of Semi 1",
       teamB: "Winner of Semi 2",
@@ -199,6 +240,7 @@ export const createFixtures = async (tournamentId: string): Promise<void> => {
     });
     matches.push({
       tournamentId,
+      organizerId: tournament.organizerId,
       stage: "final",
       teamA: "Loser of Semi 1",
       teamB: "Loser of Semi 2",
@@ -237,7 +279,7 @@ export const createFixtures = async (tournamentId: string): Promise<void> => {
   }
 };
 
-export const createTestTournamentWithTeams = async (): Promise<string> => {
+export const createTestTournamentWithTeams = async (organizerId: string = "org-1"): Promise<string> => {
   const testTeams: Team[] = Array.from({ length: 8 }, (_, i) => ({
     id: `temp-${i + 1}`,
     name: `Team ${i + 1}`,
@@ -245,7 +287,7 @@ export const createTestTournamentWithTeams = async (): Promise<string> => {
   }));
 
   const tournamentId = await createTournament({
-    organizerId: "org-1",
+    organizerId,
     name: "Test 8-Team Pro",
     dateStart: new Date().toISOString().split("T")[0],
     dateEnd: new Date().toISOString().split("T")[0],
@@ -287,6 +329,19 @@ export const getMatch = async (id: string): Promise<Match | null> => {
     return { id: snapshot.id, ...snapshot.data() } as Match;
   }
   return null;
+};
+
+export const getMatchesByTeam = async (teamName: string): Promise<Match[]> => {
+  // Firestore doesn't support OR queries directly without multiple queries or composite indexes
+  const qA = query(matchesCollection, where("teamA", "==", teamName));
+  const qB = query(matchesCollection, where("teamB", "==", teamName));
+  const [snapA, snapB] = await Promise.all([getDocs(qA), getDocs(qB)]);
+  
+  const matchesMap = new Map<string, Match>();
+  snapA.docs.forEach(doc => matchesMap.set(doc.id, { id: doc.id, ...doc.data() } as Match));
+  snapB.docs.forEach(doc => matchesMap.set(doc.id, { id: doc.id, ...doc.data() } as Match));
+  
+  return Array.from(matchesMap.values());
 };
 
 export const getRunningMatches = async (): Promise<Match[]> => {
@@ -358,6 +413,25 @@ export const getStandings = async (tournamentId: string): Promise<Standing[]> =>
     if (b.points !== a.points) return b.points - a.points;
     return b.diff - a.diff;
   });
+};
+
+export const getStandingsByTeam = async (teamName: string): Promise<Standing[]> => {
+  const q = query(standingsCollection, where("team", "==", teamName));
+  const snapshot = await getDocs(q);
+  return snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }) as Standing);
+};
+
+export const getTeamInfo = async (teamName: string): Promise<Team | null> => {
+  // Find a tournament where this team is registered
+  const snapshot = await getDocs(tournamentsCollection);
+  for (const doc of snapshot.docs) {
+    const data = doc.data() as Tournament;
+    const team = data.registeredTeams?.find(t => t.name === teamName);
+    if (team) {
+      return team;
+    }
+  }
+  return null;
 };
 
 // Additional helper functions can be added as needed

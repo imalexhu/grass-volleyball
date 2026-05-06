@@ -1,10 +1,18 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState, useEffect, useCallback } from "react";
-import { getMatch, subscribeToMatch, updateMatchVideoUrl } from "@/lib/api";
-import type { Match } from "@/lib/types";
-import { SiteHeader } from "@/components/SiteHeader";
+import { getMatch, subscribeToMatch, updateMatchVideoUrl, getTournament } from "@/lib/api";
+import type { Match, Tournament } from "@/lib/types";
+
 import { Button } from "@/components/ui/button";
-import { ChevronLeft, UploadCloud, Loader2, Video, Trophy, Zap } from "lucide-react";
+import { ChevronLeft, UploadCloud, Loader2, Video, Trophy, Zap, Home, ChevronRight } from "lucide-react";
+import {
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbList,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
+} from "@/components/ui/breadcrumb";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/match/$matchId")({
@@ -14,11 +22,16 @@ export const Route = createFileRoute("/match/$matchId")({
 function MatchDetails() {
   const { matchId } = Route.useParams();
   const [match, setMatch] = useState<Match | null>(null);
+  const [tournament, setTournament] = useState<Tournament | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    getMatch(matchId).then((m) => {
+    getMatch(matchId).then(async (m) => {
       setMatch(m);
+      if (m?.tournamentId) {
+        const t = await getTournament(m.tournamentId);
+        setTournament(t);
+      }
       setLoading(false);
     });
 
@@ -30,25 +43,19 @@ function MatchDetails() {
   }, [matchId]);
   if (loading) {
     return (
-      <div className="min-h-screen bg-background flex flex-col">
-        <SiteHeader />
-        <div className="flex-1 flex items-center justify-center">
-          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-        </div>
+      <div className="flex-1 flex items-center justify-center w-full">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
       </div>
     );
   }
 
   if (!match) {
     return (
-      <div className="min-h-screen bg-background flex flex-col">
-        <SiteHeader />
-        <div className="flex-1 flex items-center justify-center flex-col gap-4">
-          <p className="text-muted-foreground">Match not found.</p>
-          <Button asChild variant="outline">
-            <Link to="/">Return Home</Link>
-          </Button>
-        </div>
+      <div className="flex-1 flex items-center justify-center flex-col gap-4 w-full">
+        <p className="text-muted-foreground">Match not found.</p>
+        <Button asChild variant="outline">
+          <Link to="/">Return Home</Link>
+        </Button>
       </div>
     );
   }
@@ -59,15 +66,35 @@ function MatchDetails() {
   const scoreB = isComplete ? match.scoreB : match.currentSetScoreB;
 
   return (
-    <div className="min-h-screen bg-background flex flex-col">
-      <SiteHeader />
-
+    <div className="flex-1 w-full flex flex-col">
       <main className="flex-1 max-w-5xl mx-auto w-full px-4 py-8">
-        <Button variant="ghost" className="mb-6 -ml-4" asChild>
-          <Link to="/">
-            <ChevronLeft className="h-4 w-4 mr-2" /> Back to matches
-          </Link>
-        </Button>
+        <Breadcrumb className="mb-6">
+          <BreadcrumbList>
+            <BreadcrumbItem>
+              <BreadcrumbLink asChild>
+                <Link to="/">Home</Link>
+              </BreadcrumbLink>
+            </BreadcrumbItem>
+            <BreadcrumbSeparator />
+            <BreadcrumbItem>
+              <BreadcrumbLink asChild>
+                <Link to="/home">Tournaments</Link>
+              </BreadcrumbLink>
+            </BreadcrumbItem>
+            {tournament && (
+              <>
+                <BreadcrumbSeparator />
+                <BreadcrumbItem>
+                  <BreadcrumbPage>{tournament.name}</BreadcrumbPage>
+                </BreadcrumbItem>
+              </>
+            )}
+            <BreadcrumbSeparator />
+            <BreadcrumbItem>
+              <BreadcrumbPage>Match {match.court ? `(Court ${match.court})` : matchId.substring(0, 4)}</BreadcrumbPage>
+            </BreadcrumbItem>
+          </BreadcrumbList>
+        </Breadcrumb>
 
         {/* Header section */}
         <div className="glass-strong border border-border rounded-3xl p-8 mb-8 relative overflow-hidden">

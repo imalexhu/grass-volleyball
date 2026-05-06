@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as TosRouteImport } from './routes/tos'
 import { Route as RegisterRouteImport } from './routes/register'
+import { Route as ProfileRouteImport } from './routes/profile'
 import { Route as PolicyRouteImport } from './routes/policy'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as HomeRouteImport } from './routes/home'
@@ -18,6 +19,8 @@ import { Route as ForgotPasswordRouteImport } from './routes/forgot-password'
 import { Route as ManageRouteRouteImport } from './routes/manage/route'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ManageIndexRouteImport } from './routes/manage/index'
+import { Route as TeamTeamIdRouteImport } from './routes/team.$teamId'
+import { Route as OrgOrgIdRouteImport } from './routes/org.$orgId'
 import { Route as MatchMatchIdRouteImport } from './routes/match.$matchId'
 import { Route as CheckoutSuccessRouteImport } from './routes/checkout.success'
 import { Route as CheckoutCancelRouteImport } from './routes/checkout.cancel'
@@ -32,6 +35,11 @@ const TosRoute = TosRouteImport.update({
 const RegisterRoute = RegisterRouteImport.update({
   id: '/register',
   path: '/register',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ProfileRoute = ProfileRouteImport.update({
+  id: '/profile',
+  path: '/profile',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PolicyRoute = PolicyRouteImport.update({
@@ -69,6 +77,16 @@ const ManageIndexRoute = ManageIndexRouteImport.update({
   path: '/',
   getParentRoute: () => ManageRouteRoute,
 } as any)
+const TeamTeamIdRoute = TeamTeamIdRouteImport.update({
+  id: '/team/$teamId',
+  path: '/team/$teamId',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const OrgOrgIdRoute = OrgOrgIdRouteImport.update({
+  id: '/org/$orgId',
+  path: '/org/$orgId',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const MatchMatchIdRoute = MatchMatchIdRouteImport.update({
   id: '/match/$matchId',
   path: '/match/$matchId',
@@ -103,11 +121,14 @@ export interface FileRoutesByFullPath {
   '/home': typeof HomeRoute
   '/login': typeof LoginRoute
   '/policy': typeof PolicyRoute
+  '/profile': typeof ProfileRoute
   '/register': typeof RegisterRoute
   '/tos': typeof TosRoute
   '/checkout/cancel': typeof CheckoutCancelRoute
   '/checkout/success': typeof CheckoutSuccessRoute
   '/match/$matchId': typeof MatchMatchIdRoute
+  '/org/$orgId': typeof OrgOrgIdRoute
+  '/team/$teamId': typeof TeamTeamIdRoute
   '/manage/': typeof ManageIndexRoute
   '/manage/postmatch-process/$matchId': typeof ManagePostmatchProcessMatchIdRoute
   '/manage/score/$matchId': typeof ManageScoreMatchIdRoute
@@ -118,11 +139,14 @@ export interface FileRoutesByTo {
   '/home': typeof HomeRoute
   '/login': typeof LoginRoute
   '/policy': typeof PolicyRoute
+  '/profile': typeof ProfileRoute
   '/register': typeof RegisterRoute
   '/tos': typeof TosRoute
   '/checkout/cancel': typeof CheckoutCancelRoute
   '/checkout/success': typeof CheckoutSuccessRoute
   '/match/$matchId': typeof MatchMatchIdRoute
+  '/org/$orgId': typeof OrgOrgIdRoute
+  '/team/$teamId': typeof TeamTeamIdRoute
   '/manage': typeof ManageIndexRoute
   '/manage/postmatch-process/$matchId': typeof ManagePostmatchProcessMatchIdRoute
   '/manage/score/$matchId': typeof ManageScoreMatchIdRoute
@@ -135,11 +159,14 @@ export interface FileRoutesById {
   '/home': typeof HomeRoute
   '/login': typeof LoginRoute
   '/policy': typeof PolicyRoute
+  '/profile': typeof ProfileRoute
   '/register': typeof RegisterRoute
   '/tos': typeof TosRoute
   '/checkout/cancel': typeof CheckoutCancelRoute
   '/checkout/success': typeof CheckoutSuccessRoute
   '/match/$matchId': typeof MatchMatchIdRoute
+  '/org/$orgId': typeof OrgOrgIdRoute
+  '/team/$teamId': typeof TeamTeamIdRoute
   '/manage/': typeof ManageIndexRoute
   '/manage/postmatch-process/$matchId': typeof ManagePostmatchProcessMatchIdRoute
   '/manage/score/$matchId': typeof ManageScoreMatchIdRoute
@@ -153,11 +180,14 @@ export interface FileRouteTypes {
     | '/home'
     | '/login'
     | '/policy'
+    | '/profile'
     | '/register'
     | '/tos'
     | '/checkout/cancel'
     | '/checkout/success'
     | '/match/$matchId'
+    | '/org/$orgId'
+    | '/team/$teamId'
     | '/manage/'
     | '/manage/postmatch-process/$matchId'
     | '/manage/score/$matchId'
@@ -168,11 +198,14 @@ export interface FileRouteTypes {
     | '/home'
     | '/login'
     | '/policy'
+    | '/profile'
     | '/register'
     | '/tos'
     | '/checkout/cancel'
     | '/checkout/success'
     | '/match/$matchId'
+    | '/org/$orgId'
+    | '/team/$teamId'
     | '/manage'
     | '/manage/postmatch-process/$matchId'
     | '/manage/score/$matchId'
@@ -184,11 +217,14 @@ export interface FileRouteTypes {
     | '/home'
     | '/login'
     | '/policy'
+    | '/profile'
     | '/register'
     | '/tos'
     | '/checkout/cancel'
     | '/checkout/success'
     | '/match/$matchId'
+    | '/org/$orgId'
+    | '/team/$teamId'
     | '/manage/'
     | '/manage/postmatch-process/$matchId'
     | '/manage/score/$matchId'
@@ -201,11 +237,14 @@ export interface RootRouteChildren {
   HomeRoute: typeof HomeRoute
   LoginRoute: typeof LoginRoute
   PolicyRoute: typeof PolicyRoute
+  ProfileRoute: typeof ProfileRoute
   RegisterRoute: typeof RegisterRoute
   TosRoute: typeof TosRoute
   CheckoutCancelRoute: typeof CheckoutCancelRoute
   CheckoutSuccessRoute: typeof CheckoutSuccessRoute
   MatchMatchIdRoute: typeof MatchMatchIdRoute
+  OrgOrgIdRoute: typeof OrgOrgIdRoute
+  TeamTeamIdRoute: typeof TeamTeamIdRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -222,6 +261,13 @@ declare module '@tanstack/react-router' {
       path: '/register'
       fullPath: '/register'
       preLoaderRoute: typeof RegisterRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/profile': {
+      id: '/profile'
+      path: '/profile'
+      fullPath: '/profile'
+      preLoaderRoute: typeof ProfileRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/policy': {
@@ -272,6 +318,20 @@ declare module '@tanstack/react-router' {
       fullPath: '/manage/'
       preLoaderRoute: typeof ManageIndexRouteImport
       parentRoute: typeof ManageRouteRoute
+    }
+    '/team/$teamId': {
+      id: '/team/$teamId'
+      path: '/team/$teamId'
+      fullPath: '/team/$teamId'
+      preLoaderRoute: typeof TeamTeamIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/org/$orgId': {
+      id: '/org/$orgId'
+      path: '/org/$orgId'
+      fullPath: '/org/$orgId'
+      preLoaderRoute: typeof OrgOrgIdRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/match/$matchId': {
       id: '/match/$matchId'
@@ -334,11 +394,14 @@ const rootRouteChildren: RootRouteChildren = {
   HomeRoute: HomeRoute,
   LoginRoute: LoginRoute,
   PolicyRoute: PolicyRoute,
+  ProfileRoute: ProfileRoute,
   RegisterRoute: RegisterRoute,
   TosRoute: TosRoute,
   CheckoutCancelRoute: CheckoutCancelRoute,
   CheckoutSuccessRoute: CheckoutSuccessRoute,
   MatchMatchIdRoute: MatchMatchIdRoute,
+  OrgOrgIdRoute: OrgOrgIdRoute,
+  TeamTeamIdRoute: TeamTeamIdRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

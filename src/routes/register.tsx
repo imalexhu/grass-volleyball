@@ -2,11 +2,23 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Volleyball } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { useState } from "react";
 import { createUserWithEmailAndPassword, updateProfile } from "firebase/auth";
 import { auth } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import * as z from "zod";
+
+const registerSchema = z.object({
+  name: z.string().min(2, "Name must be at least 2 characters"),
+  email: z.string().email("Please enter a valid email address"),
+  password: z.string().min(6, "Password must be at least 6 characters"),
+});
+
+type RegisterFormValues = z.infer<typeof registerSchema>;
 
 export const Route = createFileRoute("/register")({
   component: Register,
@@ -14,21 +26,24 @@ export const Route = createFileRoute("/register")({
 });
 
 function Register() {
-  const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
   const { signInWithGoogle, signInWithApple } = useAuth();
 
-  const handleRegister = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!name || !email || !password) return toast.error("Please fill in all required fields.");
-    
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+  } = useForm<RegisterFormValues>({
+    resolver: zodResolver(registerSchema),
+    mode: "onSubmit",
+  });
+
+  const onSubmit = async (data: RegisterFormValues) => {
     setLoading(true);
     try {
-      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-      await updateProfile(userCredential.user, { displayName: name });
+      const userCredential = await createUserWithEmailAndPassword(auth, data.email, data.password);
+      await updateProfile(userCredential.user, { displayName: data.name });
       toast.success("Account created successfully!");
       navigate({ to: "/home" });
     } catch (error: any) {
@@ -72,37 +87,37 @@ function Register() {
           <h1 className="text-xl font-semibold tracking-tight">Join the comp</h1>
           <p className="text-sm text-muted-foreground mt-1">Create your player account.</p>
 
-          <form className="mt-6 space-y-4" onSubmit={handleRegister}>
+          <form className="mt-6 space-y-4" onSubmit={handleSubmit(onSubmit)}>
             <div>
-              <label className="text-xs font-medium text-muted-foreground">Full name</label>
+              <label className={errors.name ? "text-xs font-medium text-destructive" : "text-xs font-medium text-muted-foreground"}>Full name</label>
               <Input 
                 placeholder="Alex Carter" 
-                className="mt-1 bg-background border-border" 
-                value={name}
-                onChange={(e) => setName(e.target.value)}
+                className={cn("mt-1 bg-background border-border", errors.name ? "border-destructive" : "")} 
+                {...register("name")}
               />
+              {errors.name && <span className="text-xs text-destructive">{errors.name.message}</span>}
             </div>
             <div>
-              <label className="text-xs font-medium text-muted-foreground">Email</label>
+              <label className={errors.email ? "text-xs font-medium text-destructive" : "text-xs font-medium text-muted-foreground"}>Email</label>
               <Input 
                 type="email" 
                 placeholder="you@adelaide.com" 
-                className="mt-1 bg-background border-border" 
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                className={cn("mt-1 bg-background border-border", errors.email ? "border-destructive" : "")} 
+                {...register("email")}
               />
+              {errors.email && <span className="text-xs text-destructive">{errors.email.message}</span>}
             </div>
             <div>
-              <label className="text-xs font-medium text-muted-foreground">Password</label>
+              <label className={errors.password ? "text-xs font-medium text-destructive" : "text-xs font-medium text-muted-foreground"}>Password</label>
               <Input 
                 type="password" 
                 placeholder="••••••••" 
-                className="mt-1 bg-background border-border" 
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
+                className={cn("mt-1 bg-background border-border", errors.password ? "border-destructive" : "")} 
+                {...register("password")}
               />
+              {errors.password && <span className="text-xs text-destructive">{errors.password.message}</span>}
             </div>
-            <Button disabled={loading} className="w-full bg-gradient-to-r from-primary to-primary-glow text-primary-foreground hover:opacity-90 shadow-glow">
+            <Button disabled={loading} type="submit" className="w-full bg-gradient-to-r from-primary to-primary-glow text-primary-foreground hover:opacity-90 shadow-glow">
               {loading ? "Creating..." : "Create account"}
             </Button>
           </form>

@@ -178,10 +178,26 @@ export function TournamentModal({
                         <div className="text-[10px] uppercase">Court {m.court}</div>
                       </div>
                       <div className="min-w-0">
-                        <div className="text-sm font-medium truncate">
-                          {m.teamA} <span className="text-muted-foreground mx-1">vs</span> {m.teamB}
+                        <div className="text-sm font-medium truncate flex items-center gap-2">
+                          <Link 
+                            to="/team/$teamId" 
+                            params={{ teamId: m.teamA }} 
+                            className="hover:text-primary transition-colors hover:underline"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            {m.teamA}
+                          </Link>
+                          <span className="text-muted-foreground mx-1 text-xs font-normal">vs</span> 
+                          <Link 
+                            to="/team/$teamId" 
+                            params={{ teamId: m.teamB }} 
+                            className="hover:text-primary transition-colors hover:underline"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            {m.teamB}
+                          </Link>
                         </div>
-                        <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                        <div className="text-[10px] uppercase tracking-wide text-muted-foreground mt-0.5">
                           {m.stage} {m.pool && `· Pool ${m.pool}`}
                         </div>
                       </div>
@@ -283,7 +299,13 @@ export function TournamentModal({
                               <tr key={s.team} className="border-t border-border hover:bg-muted/10">
                                 <td className="px-3 py-2 font-medium flex items-center gap-2">
                                   <span className="text-xs text-muted-foreground w-3">{sIdx + 1}</span>
-                                  {s.team}
+                                  <Link 
+                                    to="/team/$teamId" 
+                                    params={{ teamId: s.team }} 
+                                    className="hover:text-primary transition-colors hover:underline"
+                                  >
+                                    {s.team}
+                                  </Link>
                                 </td>
                                 <td className="px-3 py-2 text-right tabular-nums">{s.played}</td>
                                 <td className="px-3 py-2 text-right tabular-nums">{s.won}</td>
@@ -311,8 +333,14 @@ export function TournamentModal({
                 .sort((a, b) => a.name.localeCompare(b.name))
                 .map((t) => (
                   <div key={t.id} className="rounded-lg border border-border bg-surface px-4 py-3">
-                    <div className="text-sm font-medium">{t.name}</div>
-                    <div className="text-xs text-muted-foreground">Captain · {t.captain}</div>
+                    <Link 
+                      to="/team/$teamId" 
+                      params={{ teamId: t.name }} 
+                      className="text-sm font-medium hover:text-primary transition-colors hover:underline"
+                    >
+                      {t.name}
+                    </Link>
+                    <div className="text-xs text-muted-foreground mt-1">Captain · {t.captain}</div>
                   </div>
                 ))}
             </TabsContent>
@@ -367,8 +395,15 @@ export function TournamentModal({
                   .sort((a, b) => a.name.localeCompare(b.name))
                   .map((t) => (
                     <div key={t.id} className="rounded-lg border border-border bg-surface px-4 py-3">
-                      <div className="text-sm font-medium">{t.name}</div>
-                      <div className="text-xs text-muted-foreground">Captain · {t.captain}</div>
+                      <Link 
+                        to="/team/$teamId" 
+                        params={{ teamId: t.name }} 
+                        className="text-sm font-medium hover:text-primary transition-colors hover:underline"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        {t.name}
+                      </Link>
+                      <div className="text-xs text-muted-foreground mt-1">Captain · {t.captain}</div>
                     </div>
                   ))}
                 {Array.from({ length: tournament.maxTeams - (tournament.registeredTeams?.length || 0) }).map((_, i) => (

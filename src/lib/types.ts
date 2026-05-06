@@ -6,7 +6,7 @@ export const statusLabel: Record<TournamentStatus, string> = {
   complete: "Complete",
 };
 
-export type UserRole = "player" | "organization";
+export type UserRole = "player" | "organization" | "admin";
 
 export interface UserProfile {
   id: string; // Firebase Auth UID
@@ -14,6 +14,8 @@ export interface UserProfile {
   displayName: string | null;
   role: UserRole;
   organizationName?: string; // Present if role is "organization"
+  organizationLogo?: string;
+  organizationDescription?: string;
 }
 
 export interface Team {

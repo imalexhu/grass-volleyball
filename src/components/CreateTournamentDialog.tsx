@@ -24,6 +24,7 @@ import { createTournament } from "@/lib/api";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import type { TournamentStatus } from "@/lib/types";
+import { useAuth } from "@/contexts/AuthContext";
 
 const tournamentSchema = z.object({
   name: z.string().min(1, "Tournament name is required"),
@@ -57,6 +58,7 @@ export function CreateTournamentDialog() {
     setValue,
     watch,
     reset,
+    formState: { errors },
   } = useForm<TournamentFormValues>({
     resolver: zodResolver(tournamentSchema),
     mode: "onSubmit",
@@ -74,11 +76,14 @@ export function CreateTournamentDialog() {
   const dateStart = watch("dateStart");
   const dateEnd = watch("dateEnd");
 
+  const { userProfile } = useAuth();
+
   const mutation = useMutation({
     mutationFn: (data: TournamentFormValues) => {
+      if (!userProfile) throw new Error("Must be logged in to create a tournament");
       return createTournament({
         ...data,
-        organizerId: "org-1", // TODO: Use real user ID
+        organizerId: userProfile.id,
         dateStart: data.dateStart.toISOString(),
         dateEnd: data.dateEnd.toISOString(),
         description: data.description || "",
@@ -103,11 +108,9 @@ export function CreateTournamentDialog() {
   };
 
   const onError = (errors: any) => {
-    // Show each error as a toast
-    Object.values(errors).forEach((error: any) => {
-      toast.error(error.message || "Invalid input", {
-        position: "bottom-right",
-      });
+    // Optionally keep toast for general failure indication
+    toast.error("Please fix the validation errors in the form", {
+      position: "bottom-right",
     });
   };
 
@@ -128,17 +131,19 @@ export function CreateTournamentDialog() {
           </DialogHeader>
           <div className="grid gap-4 py-4">
             <div className="grid gap-2">
-              <Label htmlFor="name">Tournament Name</Label>
+              <Label htmlFor="name" className={errors.name ? "text-destructive" : ""}>Tournament Name</Label>
               <Input
                 id="name"
                 placeholder="e.g. Summer Series #1"
+                className={errors.name ? "border-destructive" : ""}
                 {...register("name")}
               />
+              {errors.name && <span className="text-xs text-destructive">{errors.name.message}</span>}
             </div>
 
             <div className="grid grid-cols-2 gap-4">
               <div className="grid gap-2">
-                <Label>Start Date</Label>
+                <Label className={errors.dateStart ? "text-destructive" : ""}>Start Date</Label>
                 <Popover>
                   <PopoverTrigger asChild>
                     <Button
@@ -146,7 +151,8 @@ export function CreateTournamentDialog() {
                       type="button"
                       className={cn(
                         "w-full justify-start text-left font-normal",
-                        !dateStart && "text-muted-foreground"
+                        !dateStart && "text-muted-foreground",
+                        errors.dateStart && "border-destructive text-destructive"
                       )}
                     >
                       <CalendarIcon className="mr-2 h-4 w-4" />
@@ -157,14 +163,15 @@ export function CreateTournamentDialog() {
                     <Calendar
                       mode="single"
                       selected={dateStart}
-                      onSelect={(date) => date && setValue("dateStart", date)}
+                      onSelect={(date) => date && setValue("dateStart", date, { shouldValidate: true })}
                       initialFocus
                     />
                   </PopoverContent>
                 </Popover>
+                {errors.dateStart && <span className="text-xs text-destructive">{errors.dateStart.message}</span>}
               </div>
               <div className="grid gap-2">
-                <Label>End Date</Label>
+                <Label className={errors.dateEnd ? "text-destructive" : ""}>End Date</Label>
                 <Popover>
                   <PopoverTrigger asChild>
                     <Button
@@ -172,7 +179,8 @@ export function CreateTournamentDialog() {
                       type="button"
                       className={cn(
                         "w-full justify-start text-left font-normal",
-                        !dateEnd && "text-muted-foreground"
+                        !dateEnd && "text-muted-foreground",
+                        errors.dateEnd && "border-destructive text-destructive"
                       )}
                     >
                       <CalendarIcon className="mr-2 h-4 w-4" />
@@ -183,59 +191,69 @@ export function CreateTournamentDialog() {
                     <Calendar
                       mode="single"
                       selected={dateEnd}
-                      onSelect={(date) => date && setValue("dateEnd", date)}
+                      onSelect={(date) => date && setValue("dateEnd", date, { shouldValidate: true })}
                       initialFocus
                     />
                   </PopoverContent>
                 </Popover>
+                {errors.dateEnd && <span className="text-xs text-destructive">{errors.dateEnd.message}</span>}
               </div>
             </div>
 
             <div className="grid gap-2">
-              <Label htmlFor="location">Location</Label>
+              <Label htmlFor="location" className={errors.location ? "text-destructive" : ""}>Location</Label>
               <Input
                 id="location"
                 placeholder="e.g. City South Arena"
+                className={errors.location ? "border-destructive" : ""}
                 {...register("location")}
               />
+              {errors.location && <span className="text-xs text-destructive">{errors.location.message}</span>}
             </div>
 
             <div className="grid gap-2">
-              <Label htmlFor="format">Format</Label>
+              <Label htmlFor="format" className={errors.format ? "text-destructive" : ""}>Format</Label>
               <Input
                 id="format"
                 placeholder="e.g. Mixed 4s"
+                className={errors.format ? "border-destructive" : ""}
                 {...register("format")}
               />
+              {errors.format && <span className="text-xs text-destructive">{errors.format.message}</span>}
             </div>
 
             <div className="grid grid-cols-2 gap-4">
               <div className="grid gap-2">
-                <Label htmlFor="entryFee">Entry Fee ($)</Label>
+                <Label htmlFor="entryFee" className={errors.entryFee ? "text-destructive" : ""}>Entry Fee ($)</Label>
                 <Input
                   id="entryFee"
                   type="number"
+                  className={errors.entryFee ? "border-destructive" : ""}
                   {...register("entryFee", { valueAsNumber: true })}
                 />
+                {errors.entryFee && <span className="text-xs text-destructive">{errors.entryFee.message}</span>}
               </div>
               <div className="grid gap-2">
-                <Label htmlFor="maxTeams">Max Teams</Label>
+                <Label htmlFor="maxTeams" className={errors.maxTeams ? "text-destructive" : ""}>Max Teams</Label>
                 <Input
                   id="maxTeams"
                   type="number"
+                  className={errors.maxTeams ? "border-destructive" : ""}
                   {...register("maxTeams", { valueAsNumber: true })}
                 />
+                {errors.maxTeams && <span className="text-xs text-destructive">{errors.maxTeams.message}</span>}
               </div>
             </div>
 
             <div className="grid gap-2">
-              <Label htmlFor="description">Description (Optional)</Label>
+              <Label htmlFor="description" className={errors.description ? "text-destructive" : ""}>Description (Optional)</Label>
               <Textarea
                 id="description"
                 placeholder="Describe the tournament rules, prizes, etc."
-                className="min-h-[100px]"
+                className={cn("min-h-[100px]", errors.description ? "border-destructive" : "")}
                 {...register("description")}
               />
+              {errors.description && <span className="text-xs text-destructive">{errors.description.message}</span>}
             </div>
           </div>
           <DialogFooter>

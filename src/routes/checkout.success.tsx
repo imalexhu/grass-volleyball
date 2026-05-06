@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { SiteHeader } from "@/components/SiteHeader";
+
 import { Button } from "@/components/ui/button";
 import { CheckCircle, Loader2 } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -59,8 +59,7 @@ function CheckoutSuccess() {
   }, [session_id]);
 
   return (
-    <div className="min-h-screen flex flex-col">
-      <SiteHeader />
+    <div className="flex-1 flex-col w-full">
       <div className="flex-1 flex items-center justify-center">
         <div className="mx-auto max-w-xl px-4 py-16 text-center glass rounded-2xl border border-primary/20 shadow-glow">
           {status === "loading" && (

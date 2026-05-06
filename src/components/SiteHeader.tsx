@@ -1,7 +1,8 @@
 import { Link } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
-import { Volleyball, LogOut } from "lucide-react";
+import { Volleyball, LogOut, Menu } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
+import { Sheet, SheetContent, SheetTrigger, SheetTitle, SheetHeader } from "@/components/ui/sheet";
 
 export function SiteHeader() {
   const { user, logout } = useAuth();
@@ -9,14 +10,60 @@ export function SiteHeader() {
   return (
     <header className="sticky top-0 z-40 w-full border-b border-border/60 glass-strong">
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
-        <Link to="/" className="flex items-center gap-2 group">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-primary to-primary-glow shadow-glow transition-transform group-hover:scale-105">
-            <Volleyball className="h-4 w-4 text-primary-foreground" />
-          </div>
-          <span className="font-semibold tracking-tight">
-            Adelaide<span className="text-primary"> Grass</span>
-          </span>
-        </Link>
+        <div className="flex items-center gap-4">
+          <Sheet>
+            <SheetTrigger asChild>
+              <Button variant="ghost" size="icon" className="md:hidden">
+                <Menu className="h-5 w-5" />
+                <span className="sr-only">Toggle navigation menu</span>
+              </Button>
+            </SheetTrigger>
+            <SheetContent side="left" className="w-[280px] sm:w-[320px]">
+              <SheetHeader className="text-left">
+                <SheetTitle className="flex items-center gap-2">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-primary to-primary-glow shadow-glow">
+                    <Volleyball className="h-4 w-4 text-primary-foreground" />
+                  </div>
+                  <span className="font-semibold tracking-tight">AGV</span>
+                </SheetTitle>
+              </SheetHeader>
+              <nav className="flex flex-col gap-4 mt-8">
+                <Link
+                  to="/"
+                  className="text-lg font-medium text-muted-foreground hover:text-foreground transition-colors"
+                  activeProps={{ className: "text-lg font-medium text-foreground" }}
+                >
+                  Home
+                </Link>
+                <Link
+                  to="/home"
+                  className="text-lg font-medium text-muted-foreground hover:text-foreground transition-colors"
+                  activeProps={{ className: "text-lg font-medium text-foreground" }}
+                >
+                  Tournaments
+                </Link>
+                {user && (
+                  <Link
+                    to="/manage"
+                    className="text-lg font-medium text-muted-foreground hover:text-foreground transition-colors"
+                    activeProps={{ className: "text-lg font-medium text-foreground" }}
+                  >
+                    Manage
+                  </Link>
+                )}
+              </nav>
+            </SheetContent>
+          </Sheet>
+
+          <Link to="/" className="flex items-center gap-2 group">
+            <div className="hidden md:flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-primary to-primary-glow shadow-glow transition-transform group-hover:scale-105">
+              <Volleyball className="h-4 w-4 text-primary-foreground" />
+            </div>
+            <span className="font-semibold tracking-tight">
+              Adelaide<span className="text-primary"> Grass</span>
+            </span>
+          </Link>
+        </div>
 
         <nav className="hidden md:flex items-center gap-1">
           <Link
@@ -46,16 +93,21 @@ export function SiteHeader() {
 
         <div className="flex items-center gap-2">
           {user ? (
-            <Button variant="ghost" size="sm" onClick={() => logout()} className="text-muted-foreground hover:text-foreground">
-              <LogOut className="h-4 w-4 mr-2" />
-              Sign out
-            </Button>
+            <>
+              <Button asChild variant="ghost" size="sm" className="hidden md:flex text-muted-foreground hover:text-foreground">
+                <Link to="/profile">Profile</Link>
+              </Button>
+              <Button variant="ghost" size="sm" onClick={() => logout()} className="text-muted-foreground hover:text-foreground">
+                <LogOut className="h-4 w-4 md:mr-2" />
+                <span className="hidden md:inline">Sign out</span>
+              </Button>
+            </>
           ) : (
             <>
               <Button asChild variant="ghost" size="sm">
                 <Link to="/login">Sign in</Link>
               </Button>
-              <Button asChild size="sm" className="bg-gradient-to-r from-primary to-primary-glow text-primary-foreground hover:opacity-90 shadow-glow">
+              <Button asChild size="sm" className="hidden md:flex bg-gradient-to-r from-primary to-primary-glow text-primary-foreground hover:opacity-90 shadow-glow">
                 <Link to="/register">Join</Link>
               </Button>
             </>

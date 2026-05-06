@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { SiteHeader } from "@/components/SiteHeader";
+
 import { Shield, ArrowLeft } from "lucide-react";
 
 export const Route = createFileRoute("/policy")({
@@ -18,8 +18,7 @@ export const Route = createFileRoute("/policy")({
 
 function PrivacyPolicy() {
   return (
-    <div className="min-h-screen bg-background">
-      <SiteHeader />
+    <div className="flex-1 w-full">
 
       {/* Hero */}
       <section className="relative overflow-hidden border-b border-border/40">
@@ -231,22 +230,6 @@ function PrivacyPolicy() {
         </div>
       </section>
 
-      {/* Footer */}
-      <footer className="border-t border-border bg-card/20 py-8">
-        <div className="mx-auto max-w-4xl px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-4">
-          <p className="text-sm text-muted-foreground">
-            © 2026 Adelaide Grass Volleyball. All rights reserved.
-          </p>
-          <div className="flex gap-6 text-sm font-bold uppercase tracking-widest text-muted-foreground">
-            <Link to="/tos" className="hover:text-primary transition-colors">
-              Terms
-            </Link>
-            <Link to="/" className="hover:text-primary transition-colors">
-              Home
-            </Link>
-          </div>
-        </div>
-      </footer>
     </div>
   );
 }

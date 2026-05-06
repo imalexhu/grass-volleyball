@@ -21,6 +21,7 @@ import { createMatch } from "@/lib/api";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { ArrowUpRight } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
 
 const quickMatchSchema = z.object({
   teamA: z.string().min(1, "Team A name is required"),
@@ -48,6 +49,7 @@ export function QuickMatchDialog() {
     },
   });
 
+  const { userProfile } = useAuth();
   const mutation = useMutation({
     mutationFn: (data: QuickMatchFormValues) => {
       return createMatch({
@@ -57,6 +59,7 @@ export function QuickMatchDialog() {
         stage: "final", // Generic stage for quick match
         scheduledAt: new Date().toISOString(),
         status: "scheduled",
+        organizerId: userProfile?.id,
       });
     },
     onSuccess: (matchId) => {

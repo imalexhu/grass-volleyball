@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { SiteHeader } from "@/components/SiteHeader";
+
 import { Button } from "@/components/ui/button";
 import { XCircle } from "lucide-react";
 
@@ -9,8 +9,7 @@ export const Route = createFileRoute("/checkout/cancel")({
 
 function CheckoutCancel() {
   return (
-    <div className="min-h-screen flex flex-col">
-      <SiteHeader />
+    <div className="flex-1 flex-col w-full">
       <div className="flex-1 flex items-center justify-center">
         <div className="mx-auto max-w-xl px-4 py-20 text-center glass rounded-2xl border border-destructive/20">
           <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-full bg-destructive/10 border border-destructive/30">
