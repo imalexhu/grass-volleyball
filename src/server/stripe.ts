@@ -12,7 +12,7 @@ const getStripe = () => {
 };
 
 export const createCheckoutSession = createServerFn({ method: "POST" })
-  .inputValidator((data: { tournamentId: string; tournamentName: string; teamName: string; price: number; origin: string }) => data)
+  .inputValidator((data: { tournamentId: string; tournamentName: string; teamName: string; teamId?: string; price: number; origin: string }) => data)
   .handler(async ({ data }) => {
     const stripe = getStripe();
 
@@ -37,6 +37,7 @@ export const createCheckoutSession = createServerFn({ method: "POST" })
       metadata: {
         tournamentId: data.tournamentId,
         teamName: data.teamName,
+        teamId: data.teamId || "",
       },
     });
 

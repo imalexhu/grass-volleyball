@@ -8,6 +8,10 @@ export const statusLabel: Record<TournamentStatus, string> = {
 
 export type UserRole = "player" | "organization" | "admin";
 
+// ═══════════════════════════════
+// Player / User
+// ═══════════════════════════════
+
 export interface UserProfile {
   id: string; // Firebase Auth UID
   email: string | null;
@@ -16,13 +20,49 @@ export interface UserProfile {
   organizationName?: string; // Present if role is "organization"
   organizationLogo?: string;
   organizationDescription?: string;
+  // New: team membership
+  teamIds: string[]; // Max 3 teams per player
+  joinedAt: number; // Date.now() timestamp
 }
 
-export interface Team {
+// ═══════════════════════════════
+// Teams (first-class Firestore collection)
+// ═══════════════════════════════
+
+export interface TeamMember {
+  userId: string;
+  displayName: string;
+  joinedAt: number;
+}
+
+export interface TeamDoc {
   id: string;
   name: string;
-  captain: string;
+  captainId: string;
+  members: TeamMember[]; // 1–4 — exactly 4 when registered for a tournament
+  createdAt: number;
+  isActive: boolean; // soft-delete / disband
 }
+
+// ═══════════════════════════════
+// Tournament Embedded Team
+// ═══════════════════════════════
+// Legacy (existing tournaments): { id, name, captain }
+// New (post-migration):           { id, name, captainId, memberNames[] }
+
+export interface RegisteredTeam {
+  id: string;
+  name: string;
+  // Legacy fields
+  captain?: string;
+  // New fields
+  captainId?: string;
+  memberNames?: string[];
+}
+
+// ═══════════════════════════════
+// Tournament
+// ═══════════════════════════════
 
 export interface Tournament {
   id: string;
@@ -31,13 +71,18 @@ export interface Tournament {
   dateStart: string;
   dateEnd: string;
   location: string;
-  format: string; // "8-pool" etc.
+  format: string; // "4v4 Pool Play + Finals" etc.
   description: string;
   entryFee: number;
-  maxTeams: number;
-  registeredTeams: Team[];
+  maxTeams: number; // 8 for Adelaide format
+  maxPlayersPerTeam: number; // 4 for Adelaide format
+  registeredTeams: RegisteredTeam[];
   status: TournamentStatus;
 }
+
+// ═══════════════════════════════
+// Match / Scoring
+// ═══════════════════════════════
 
 export interface MatchEvent {
   id: string;
@@ -115,3 +160,12 @@ export interface Standing {
   pool?: "A" | "B";
 }
 
+// ═══════════════════════════════
+// Deprecated — kept for backward compat
+// ═══════════════════════════════
+/** @deprecated Use RegisteredTeam instead. Kept for reading legacy tournaments. */
+export interface Team {
+  id: string;
+  name: string;
+  captain: string;
+}

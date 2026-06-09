@@ -37,7 +37,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             id: user.uid,
             email: user.email,
             displayName: user.displayName,
-            role: "player"
+            role: "player" as const,
+            teamIds: [],
+            joinedAt: Date.now(),
           };
           await createUserProfile(profile);
         }

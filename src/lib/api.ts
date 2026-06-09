@@ -1,12 +1,13 @@
 import { collection, doc, getDocs, getDoc, setDoc, addDoc, updateDoc, deleteDoc, query, where, orderBy, onSnapshot, writeBatch } from "firebase/firestore";
 import { db } from "./firebase";
-import type { Tournament, Match, Standing, Team, MatchEvent, VideoProcessingJob, UserProfile } from "./types";
+import type { Tournament, Match, Standing, Team, MatchEvent, VideoProcessingJob, UserProfile, TeamDoc, TeamMember, RegisteredTeam } from "./types";
 
 // Collections
 export const usersCollection = collection(db, "users");
 export const tournamentsCollection = collection(db, "tournaments");
 export const matchesCollection = collection(db, "matches");
 export const standingsCollection = collection(db, "standings");
+export const teamsCollection = collection(db, "teams");
 
 // Tournaments
 export const getTournaments = async (): Promise<Tournament[]> => {
@@ -86,25 +87,6 @@ export const deleteTournament = async (id: string): Promise<void> => {
   batch.delete(tournamentRef);
 
   await batch.commit();
-};
-
-export const registerTeamToTournament = async (tournamentId: string, team: Team): Promise<void> => {
-  const tournament = await getTournament(tournamentId);
-  if (!tournament) throw new Error("Tournament not found");
-
-  // Check if team already registered (prevent duplicates)
-  if (tournament.registeredTeams?.some(t => t.name === team.name)) {
-    return;
-  }
-
-  const updatedTeams = [...(tournament.registeredTeams || []), team];
-  const updateData: Partial<Tournament> = { registeredTeams: updatedTeams };
-
-  if (updatedTeams.length >= tournament.maxTeams) {
-    updateData.status = "filled";
-  }
-
-  await updateTournament(tournamentId, updateData);
 };
 
 export const createFixtures = async (tournamentId: string): Promise<void> => {
@@ -296,6 +278,7 @@ export const createTestTournamentWithTeams = async (organizerId: string = "org-1
     description: "A test tournament with 8 teams ready for fixture generation.",
     entryFee: 120,
     maxTeams: 8,
+    maxPlayersPerTeam: 4,
     registeredTeams: testTeams,
     status: "filled",
   });
@@ -421,7 +404,7 @@ export const getStandingsByTeam = async (teamName: string): Promise<Standing[]> 
   return snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }) as Standing);
 };
 
-export const getTeamInfo = async (teamName: string): Promise<Team | null> => {
+export const getTeamInfo = async (teamName: string): Promise<RegisteredTeam | Team | null> => {
   // Find a tournament where this team is registered
   const snapshot = await getDocs(tournamentsCollection);
   for (const doc of snapshot.docs) {
@@ -684,5 +667,225 @@ export const triggerCloudRunProcessing = async (
     const text = await resp.text();
     throw new Error(`Cloud Run error ${resp.status}: ${text}`);
   }
+};
+
+// ═══════════════════════════════
+// Teams (first-class Firestore collection)
+// ═══════════════════════════════
+
+/** Create a new team. Creator becomes captain and sole member. */
+export const createTeam = async (name: string, creatorUserId: string): Promise<string> => {
+  const now = Date.now();
+  const team: Omit<TeamDoc, "id"> = {
+    name,
+    captainId: creatorUserId,
+    members: [{
+      userId: creatorUserId,
+      displayName: "",
+      joinedAt: now,
+    }],
+    createdAt: now,
+    isActive: true,
+  };
+
+  // Fetch creator's display name
+  const creatorProfile = await getUserProfile(creatorUserId);
+  if (creatorProfile) {
+    team.members[0].displayName = creatorProfile.displayName || creatorProfile.email || "Unknown";
+  }
+
+  const docRef = await addDoc(teamsCollection, team);
+
+  // Add teamId to creator's profile
+  const userRef = doc(usersCollection, creatorUserId);
+  await updateDoc(userRef, {
+    teamIds: [...(creatorProfile?.teamIds || []), docRef.id],
+  });
+
+  return docRef.id;
+};
+
+/** Get a team by ID. */
+export const getTeam = async (teamId: string): Promise<TeamDoc | null> => {
+  const docRef = doc(teamsCollection, teamId);
+  const snap = await getDoc(docRef);
+  if (snap.exists()) {
+    return { id: snap.id, ...snap.data() } as TeamDoc;
+  }
+  return null;
+};
+
+/** Get all teams a user belongs to. */
+export const getUserTeams = async (userId: string): Promise<TeamDoc[]> => {
+  const profile = await getUserProfile(userId);
+  if (!profile || !profile.teamIds.length) return [];
+
+  const teams: TeamDoc[] = [];
+  for (const teamId of profile.teamIds) {
+    const team = await getTeam(teamId);
+    if (team && team.isActive) {
+      teams.push(team);
+    }
+  }
+  return teams;
+};
+
+/** Add a member to a team. Enforces 4-player limit and 3-team-per-user limit. */
+export const addTeamMember = async (teamId: string, userId: string): Promise<void> => {
+  const team = await getTeam(teamId);
+  if (!team) throw new Error("Team not found");
+  if (!team.isActive) throw new Error("Team is no longer active");
+
+  if (team.members.length >= 4) {
+    throw new Error("Team already has 4 members (maximum)");
+  }
+
+  if (team.members.some(m => m.userId === userId)) {
+    throw new Error("User is already on this team");
+  }
+
+  const userProfile = await getUserProfile(userId);
+  if (!userProfile) throw new Error("User not found");
+  if (userProfile.teamIds.length >= 3) {
+    throw new Error("User is already on 3 teams (maximum)");
+  }
+
+  const displayName = userProfile.displayName || userProfile.email || "Unknown";
+
+  const teamRef = doc(teamsCollection, teamId);
+  await updateDoc(teamRef, {
+    members: [...team.members, { userId, displayName, joinedAt: Date.now() }],
+  });
+
+  const userRef = doc(usersCollection, userId);
+  await updateDoc(userRef, {
+    teamIds: [...userProfile.teamIds, teamId],
+  });
+};
+
+/** Remove a member from a team. */
+export const removeTeamMember = async (teamId: string, userId: string): Promise<void> => {
+  const team = await getTeam(teamId);
+  if (!team) throw new Error("Team not found");
+
+  if (team.captainId === userId) {
+    throw new Error("Cannot remove the captain. Transfer captaincy or disband the team first.");
+  }
+
+  const teamRef = doc(teamsCollection, teamId);
+  await updateDoc(teamRef, {
+    members: team.members.filter(m => m.userId !== userId),
+  });
+
+  const userProfile = await getUserProfile(userId);
+  if (userProfile) {
+    const userRef = doc(usersCollection, userId);
+    await updateDoc(userRef, {
+      teamIds: userProfile.teamIds.filter(id => id !== teamId),
+    });
+  }
+};
+
+/** Update team name. */
+export const updateTeamName = async (teamId: string, name: string): Promise<void> => {
+  const teamRef = doc(teamsCollection, teamId);
+  await updateDoc(teamRef, { name });
+};
+
+/** Disband a team (soft delete). */
+export const disbandTeam = async (teamId: string): Promise<void> => {
+  const team = await getTeam(teamId);
+  if (!team) throw new Error("Team not found");
+
+  const teamRef = doc(teamsCollection, teamId);
+  await updateDoc(teamRef, { isActive: false });
+
+  for (const member of team.members) {
+    const profile = await getUserProfile(member.userId);
+    if (profile) {
+      const userRef = doc(usersCollection, member.userId);
+      await updateDoc(userRef, {
+        teamIds: profile.teamIds.filter(id => id !== teamId),
+      });
+    }
+  }
+};
+
+/** Search users by display name (for team member lookup). */
+export const searchUsers = async (query: string): Promise<UserProfile[]> => {
+  const snapshot = await getDocs(usersCollection);
+  return snapshot.docs
+    .map(doc => ({ id: doc.id, ...doc.data() } as UserProfile))
+    .filter(u =>
+      u.displayName?.toLowerCase().includes(query.toLowerCase()) ||
+      u.email?.toLowerCase().includes(query.toLowerCase())
+    )
+    .slice(0, 10);
+};
+
+// ═══════════════════════════════
+// Tournament Team Registration (revised)
+// ═══════════════════════════════
+
+/** Register an entire team (all 4 members) to a tournament. */
+export const registerTeamToTournament = async (tournamentId: string, teamId: string): Promise<void> => {
+  const tournament = await getTournament(tournamentId);
+  if (!tournament) throw new Error("Tournament not found");
+  if (tournament.status !== "open") throw new Error("Tournament is not open for registration");
+
+  const team = await getTeam(teamId);
+  if (!team) throw new Error("Team not found");
+  if (!team.isActive) throw new Error("Team is no longer active");
+
+  if (team.members.length !== 4) {
+    throw new Error(`Team must have exactly 4 members to register (currently ${team.members.length})`);
+  }
+
+  if (tournament.registeredTeams.length >= tournament.maxTeams) {
+    throw new Error("Tournament is full");
+  }
+
+  if (tournament.registeredTeams.some(t => t.id === teamId)) {
+    throw new Error("Team is already registered for this tournament");
+  }
+
+  // Check if any team member is already registered with another team in this tournament
+  const memberIds = new Set(team.members.map(m => m.userId));
+  for (const regTeam of tournament.registeredTeams) {
+    if (regTeam.captainId && memberIds.has(regTeam.captainId)) {
+      throw new Error("One or more team members are already registered with another team in this tournament");
+    }
+  }
+
+  const registeredTeam: RegisteredTeam = {
+    id: teamId,
+    name: team.name,
+    captainId: team.captainId,
+    memberNames: team.members.map(m => m.displayName),
+  };
+
+  const updatedTeams = [...tournament.registeredTeams, registeredTeam];
+  const updateData: Partial<Tournament> = { registeredTeams: updatedTeams };
+
+  if (updatedTeams.length >= tournament.maxTeams) {
+    updateData.status = "filled";
+  }
+
+  await updateTournament(tournamentId, updateData);
+};
+
+/** Get all teams registered for a tournament (fetches full TeamDoc for each). */
+export const getTournamentTeams = async (tournamentId: string): Promise<TeamDoc[]> => {
+  const tournament = await getTournament(tournamentId);
+  if (!tournament) return [];
+
+  const teams: TeamDoc[] = [];
+  for (const reg of tournament.registeredTeams) {
+    const team = await getTeam(reg.id);
+    if (team) {
+      teams.push(team);
+    }
+  }
+  return teams;
 };
 

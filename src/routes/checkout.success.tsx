@@ -31,15 +31,18 @@ function CheckoutSuccess() {
         const session = await retrieveCheckoutSession({ data: { sessionId: session_id } });
         
         if (session.payment_status === "paid" && session.metadata) {
-          const { tournamentId, teamName } = session.metadata;
-          if (tournamentId && teamName) {
-            await registerTeamToTournament(tournamentId, {
-              id: crypto.randomUUID(),
-              name: teamName,
-              captain: "Registered User", // This should ideally come from auth or session
-            });
+          const { tournamentId, teamName, teamId } = session.metadata;
+          if (tournamentId && teamId) {
+            // New flow: register a pre-existing team by teamId
+            await registerTeamToTournament(tournamentId, teamId);
             setStatus("success");
-            toast.success("Registration confirmed!");
+            toast.success("Team registration confirmed!");
+          } else if (tournamentId && teamName) {
+            // Legacy flow: team just has a name (from free-text input) — skip registration
+            // The team will need to be created and registered via the new team system
+            console.warn("Legacy registration without teamId — team name:", teamName);
+            setStatus("success");
+            toast.success("Payment confirmed! Create your team to complete registration.");
           } else {
             console.error("Missing metadata in session", session.metadata);
             setStatus("error");

@@ -88,6 +88,7 @@ export function CreateTournamentDialog() {
         dateEnd: data.dateEnd.toISOString(),
         description: data.description || "",
         registeredTeams: [],
+        maxPlayersPerTeam: 4,
         status: "open" as TournamentStatus,
       });
     },
