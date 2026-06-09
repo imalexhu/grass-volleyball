@@ -26,6 +26,9 @@ import { Route as CheckoutSuccessRouteImport } from './routes/checkout.success'
 import { Route as CheckoutCancelRouteImport } from './routes/checkout.cancel'
 import { Route as ManageScoreMatchIdRouteImport } from './routes/manage/score/$matchId'
 import { Route as ManagePostmatchProcessMatchIdRouteImport } from './routes/manage/postmatch-process/$matchId'
+import { Route as TeamsRouteRouteImport } from './routes/teams/route'
+import { Route as TeamsIndexRouteImport } from './routes/teams/index'
+import { Route as TeamsTeamIdRouteImport } from './routes/teams/$teamId'
 
 const TosRoute = TosRouteImport.update({
   id: '/tos',
@@ -114,6 +117,24 @@ const ManagePostmatchProcessMatchIdRoute =
     getParentRoute: () => ManageRouteRoute,
   } as any)
 
+const TeamsRouteRoute = TeamsRouteRouteImport.update({
+  id: '/teams',
+  path: '/teams',
+  getParentRoute: () => rootRouteImport,
+} as any)
+
+const TeamsIndexRoute = TeamsIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => TeamsRouteRoute,
+} as any)
+
+const TeamsTeamIdRoute = TeamsTeamIdRouteImport.update({
+  id: '/$teamId',
+  path: '/$teamId',
+  getParentRoute: () => TeamsRouteRoute,
+} as any)
+
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/manage': typeof ManageRouteRouteWithChildren
@@ -132,6 +153,9 @@ export interface FileRoutesByFullPath {
   '/manage/': typeof ManageIndexRoute
   '/manage/postmatch-process/$matchId': typeof ManagePostmatchProcessMatchIdRoute
   '/manage/score/$matchId': typeof ManageScoreMatchIdRoute
+  '/teams': typeof TeamsRouteRouteWithChildren
+  '/teams/': typeof TeamsIndexRoute
+  '/teams/$teamId': typeof TeamsTeamIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -150,6 +174,8 @@ export interface FileRoutesByTo {
   '/manage': typeof ManageIndexRoute
   '/manage/postmatch-process/$matchId': typeof ManagePostmatchProcessMatchIdRoute
   '/manage/score/$matchId': typeof ManageScoreMatchIdRoute
+  '/teams': typeof TeamsIndexRoute
+  '/teams/$teamId': typeof TeamsTeamIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -170,6 +196,9 @@ export interface FileRoutesById {
   '/manage/': typeof ManageIndexRoute
   '/manage/postmatch-process/$matchId': typeof ManagePostmatchProcessMatchIdRoute
   '/manage/score/$matchId': typeof ManageScoreMatchIdRoute
+  '/teams': typeof TeamsRouteRouteWithChildren
+  '/teams/': typeof TeamsIndexRoute
+  '/teams/$teamId': typeof TeamsTeamIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -191,6 +220,9 @@ export interface FileRouteTypes {
     | '/manage/'
     | '/manage/postmatch-process/$matchId'
     | '/manage/score/$matchId'
+    | '/teams'
+    | '/teams/'
+    | '/teams/$teamId'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -209,6 +241,8 @@ export interface FileRouteTypes {
     | '/manage'
     | '/manage/postmatch-process/$matchId'
     | '/manage/score/$matchId'
+    | '/teams'
+    | '/teams/$teamId'
   id:
     | '__root__'
     | '/'
@@ -228,6 +262,9 @@ export interface FileRouteTypes {
     | '/manage/'
     | '/manage/postmatch-process/$matchId'
     | '/manage/score/$matchId'
+    | '/teams'
+    | '/teams/'
+    | '/teams/$teamId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -245,6 +282,7 @@ export interface RootRouteChildren {
   MatchMatchIdRoute: typeof MatchMatchIdRoute
   OrgOrgIdRoute: typeof OrgOrgIdRoute
   TeamTeamIdRoute: typeof TeamTeamIdRoute
+  TeamsRouteRoute: typeof TeamsRouteRouteWithChildren
 }
 
 declare module '@tanstack/react-router' {
@@ -368,8 +406,43 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ManagePostmatchProcessMatchIdRouteImport
       parentRoute: typeof ManageRouteRoute
     }
+    '/teams': {
+      id: '/teams'
+      path: '/teams'
+      fullPath: '/teams'
+      preLoaderRoute: typeof TeamsRouteRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/teams/': {
+      id: '/teams/'
+      path: '/'
+      fullPath: '/teams/'
+      preLoaderRoute: typeof TeamsIndexRouteImport
+      parentRoute: typeof TeamsRouteRoute
+    }
+    '/teams/$teamId': {
+      id: '/teams/$teamId'
+      path: '/$teamId'
+      fullPath: '/teams/$teamId'
+      preLoaderRoute: typeof TeamsTeamIdRouteImport
+      parentRoute: typeof TeamsRouteRoute
+    }
   }
 }
+
+interface TeamsRouteRouteChildren {
+  TeamsIndexRoute: typeof TeamsIndexRoute
+  TeamsTeamIdRoute: typeof TeamsTeamIdRoute
+}
+
+const TeamsRouteRouteChildren: TeamsRouteRouteChildren = {
+  TeamsIndexRoute: TeamsIndexRoute,
+  TeamsTeamIdRoute: TeamsTeamIdRoute,
+}
+
+const TeamsRouteRouteWithChildren = TeamsRouteRoute._addFileChildren(
+  TeamsRouteRouteChildren,
+)
 
 interface ManageRouteRouteChildren {
   ManageIndexRoute: typeof ManageIndexRoute
@@ -402,6 +475,7 @@ const rootRouteChildren: RootRouteChildren = {
   MatchMatchIdRoute: MatchMatchIdRoute,
   OrgOrgIdRoute: OrgOrgIdRoute,
   TeamTeamIdRoute: TeamTeamIdRoute,
+  TeamsRouteRoute: TeamsRouteRouteWithChildren,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

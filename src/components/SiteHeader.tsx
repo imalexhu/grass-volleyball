@@ -43,13 +43,22 @@ export function SiteHeader() {
                   Tournaments
                 </Link>
                 {user && (
-                  <Link
-                    to="/manage"
-                    className="text-lg font-medium text-muted-foreground hover:text-foreground transition-colors"
-                    activeProps={{ className: "text-lg font-medium text-foreground" }}
-                  >
-                    Manage
-                  </Link>
+                  <>
+                    <Link
+                      to="/teams"
+                      className="text-lg font-medium text-muted-foreground hover:text-foreground transition-colors"
+                      activeProps={{ className: "text-lg font-medium text-foreground" }}
+                    >
+                      Teams
+                    </Link>
+                    <Link
+                      to="/manage"
+                      className="text-lg font-medium text-muted-foreground hover:text-foreground transition-colors"
+                      activeProps={{ className: "text-lg font-medium text-foreground" }}
+                    >
+                      Manage
+                    </Link>
+                  </>
                 )}
               </nav>
             </SheetContent>
@@ -80,6 +89,15 @@ export function SiteHeader() {
           >
             Tournaments
           </Link>
+          {user && (
+            <Link
+              to="/teams"
+              className="px-3 py-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
+              activeProps={{ className: "px-3 py-2 text-sm text-foreground" }}
+            >
+              Teams
+            </Link>
+          )}
           {user && (
             <Link
               to="/manage"
