@@ -335,19 +335,31 @@ export const getRunningMatches = async (): Promise<Match[]> => {
 
 export const subscribeToLiveMatches = (callback: (matches: Match[]) => void) => {
   const q = query(matchesCollection, where("status", "==", "live"));
-  return onSnapshot(q, (snapshot) => {
-    const matches = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }) as Match);
-    callback(matches);
-  });
+  return onSnapshot(
+    q,
+    (snapshot) => {
+      const matches = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }) as Match);
+      callback(matches);
+    },
+    (error) => {
+      console.error("Failed to subscribe to live matches:", error);
+    }
+  );
 };
 
 export const subscribeToMatch = (matchId: string, callback: (match: Match) => void) => {
   const docRef = doc(db, "matches", matchId);
-  return onSnapshot(docRef, (doc) => {
-    if (doc.exists()) {
-      callback({ id: doc.id, ...doc.data() } as Match);
+  return onSnapshot(
+    docRef,
+    (doc) => {
+      if (doc.exists()) {
+        callback({ id: doc.id, ...doc.data() } as Match);
+      }
+    },
+    (error) => {
+      console.error(`Failed to subscribe to match ${matchId}:`, error);
     }
-  });
+  );
 };
 
 export const startMatch = async (matchId: string): Promise<void> => {
@@ -640,11 +652,17 @@ export const subscribeToProcessingJob = (
   callback: (job: VideoProcessingJob) => void
 ) => {
   const docRef = doc(db, "processingJobs", jobId);
-  return onSnapshot(docRef, (snap) => {
-    if (snap.exists()) {
-      callback({ id: snap.id, ...snap.data() } as VideoProcessingJob);
+  return onSnapshot(
+    docRef,
+    (snap) => {
+      if (snap.exists()) {
+        callback({ id: snap.id, ...snap.data() } as VideoProcessingJob);
+      }
+    },
+    (error) => {
+      console.error(`Failed to subscribe to processing job ${jobId}:`, error);
     }
-  });
+  );
 };
 
 /** Trigger the Cloud Run processor via HTTP POST. */
@@ -1127,11 +1145,17 @@ export const subscribeToNotifications = (
   callback: (notifications: UserNotification[]) => void
 ) => {
   const q = query(collection(db, "notifications"), where("userId", "==", userId));
-  return onSnapshot(q, (snap) => {
-    const notifications = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }) as UserNotification);
-    notifications.sort((a, b) => b.createdAt - a.createdAt);
-    callback(notifications);
-  });
+  return onSnapshot(
+    q,
+    (snap) => {
+      const notifications = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }) as UserNotification);
+      notifications.sort((a, b) => b.createdAt - a.createdAt);
+      callback(notifications);
+    },
+    (error) => {
+      console.error(`Failed to subscribe to notifications for user ${userId}:`, error);
+    }
+  );
 };
 
 
