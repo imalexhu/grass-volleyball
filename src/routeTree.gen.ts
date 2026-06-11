@@ -25,6 +25,7 @@ import { Route as TeamsTeamIdRouteImport } from './routes/teams/$teamId'
 import { Route as TeamTeamIdRouteImport } from './routes/team.$teamId'
 import { Route as OrgOrgIdRouteImport } from './routes/org.$orgId'
 import { Route as MatchMatchIdRouteImport } from './routes/match.$matchId'
+import { Route as JoinJoinCodeRouteImport } from './routes/join.$joinCode'
 import { Route as CheckoutSuccessRouteImport } from './routes/checkout.success'
 import { Route as CheckoutCancelRouteImport } from './routes/checkout.cancel'
 import { Route as ManageScoreMatchIdRouteImport } from './routes/manage/score/$matchId'
@@ -110,6 +111,11 @@ const MatchMatchIdRoute = MatchMatchIdRouteImport.update({
   path: '/match/$matchId',
   getParentRoute: () => rootRouteImport,
 } as any)
+const JoinJoinCodeRoute = JoinJoinCodeRouteImport.update({
+  id: '/join/$joinCode',
+  path: '/join/$joinCode',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const CheckoutSuccessRoute = CheckoutSuccessRouteImport.update({
   id: '/checkout/success',
   path: '/checkout/success',
@@ -145,6 +151,7 @@ export interface FileRoutesByFullPath {
   '/tos': typeof TosRoute
   '/checkout/cancel': typeof CheckoutCancelRoute
   '/checkout/success': typeof CheckoutSuccessRoute
+  '/join/$joinCode': typeof JoinJoinCodeRoute
   '/match/$matchId': typeof MatchMatchIdRoute
   '/org/$orgId': typeof OrgOrgIdRoute
   '/team/$teamId': typeof TeamTeamIdRoute
@@ -165,6 +172,7 @@ export interface FileRoutesByTo {
   '/tos': typeof TosRoute
   '/checkout/cancel': typeof CheckoutCancelRoute
   '/checkout/success': typeof CheckoutSuccessRoute
+  '/join/$joinCode': typeof JoinJoinCodeRoute
   '/match/$matchId': typeof MatchMatchIdRoute
   '/org/$orgId': typeof OrgOrgIdRoute
   '/team/$teamId': typeof TeamTeamIdRoute
@@ -188,6 +196,7 @@ export interface FileRoutesById {
   '/tos': typeof TosRoute
   '/checkout/cancel': typeof CheckoutCancelRoute
   '/checkout/success': typeof CheckoutSuccessRoute
+  '/join/$joinCode': typeof JoinJoinCodeRoute
   '/match/$matchId': typeof MatchMatchIdRoute
   '/org/$orgId': typeof OrgOrgIdRoute
   '/team/$teamId': typeof TeamTeamIdRoute
@@ -212,6 +221,7 @@ export interface FileRouteTypes {
     | '/tos'
     | '/checkout/cancel'
     | '/checkout/success'
+    | '/join/$joinCode'
     | '/match/$matchId'
     | '/org/$orgId'
     | '/team/$teamId'
@@ -232,6 +242,7 @@ export interface FileRouteTypes {
     | '/tos'
     | '/checkout/cancel'
     | '/checkout/success'
+    | '/join/$joinCode'
     | '/match/$matchId'
     | '/org/$orgId'
     | '/team/$teamId'
@@ -254,6 +265,7 @@ export interface FileRouteTypes {
     | '/tos'
     | '/checkout/cancel'
     | '/checkout/success'
+    | '/join/$joinCode'
     | '/match/$matchId'
     | '/org/$orgId'
     | '/team/$teamId'
@@ -277,6 +289,7 @@ export interface RootRouteChildren {
   TosRoute: typeof TosRoute
   CheckoutCancelRoute: typeof CheckoutCancelRoute
   CheckoutSuccessRoute: typeof CheckoutSuccessRoute
+  JoinJoinCodeRoute: typeof JoinJoinCodeRoute
   MatchMatchIdRoute: typeof MatchMatchIdRoute
   OrgOrgIdRoute: typeof OrgOrgIdRoute
   TeamTeamIdRoute: typeof TeamTeamIdRoute
@@ -396,6 +409,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof MatchMatchIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/join/$joinCode': {
+      id: '/join/$joinCode'
+      path: '/join/$joinCode'
+      fullPath: '/join/$joinCode'
+      preLoaderRoute: typeof JoinJoinCodeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/checkout/success': {
       id: '/checkout/success'
       path: '/checkout/success'
@@ -470,6 +490,7 @@ const rootRouteChildren: RootRouteChildren = {
   TosRoute: TosRoute,
   CheckoutCancelRoute: CheckoutCancelRoute,
   CheckoutSuccessRoute: CheckoutSuccessRoute,
+  JoinJoinCodeRoute: JoinJoinCodeRoute,
   MatchMatchIdRoute: MatchMatchIdRoute,
   OrgOrgIdRoute: OrgOrgIdRoute,
   TeamTeamIdRoute: TeamTeamIdRoute,

@@ -116,7 +116,7 @@ export interface Match {
   teamA: string;                  // String ID or team name
   teamB: string;
   court?: number;
-  scheduledAt?: string;
+  scheduledAt: string;
 
   // ── Join Codes ──
   joinCodeA?: string;             // 4 capital letters for Team A

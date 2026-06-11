@@ -15,7 +15,7 @@ import { Loader2, Zap, Calendar as CalendarIcon, FileX, Volleyball } from "lucid
 import { TournamentModal } from "@/components/TournamentModal";
 import { useState } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
-import { QuickMatchDialog } from "@/components/QuickMatchDialog";
+import { CreateMatchDialog } from "@/components/CreateMatchDialog";
 import { getMatches, getTournament } from "@/lib/api";
 import type { Match } from "@/lib/types";
 import { useNavigate } from "@tanstack/react-router";
@@ -587,7 +587,7 @@ function Admin() {
           <div>
             <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground mb-3">Quick actions</h2>
             <div className="space-y-2">
-              <QuickMatchDialog />
+              <CreateMatchDialog />
               {isAdmin && (
                 <>
                   <Action

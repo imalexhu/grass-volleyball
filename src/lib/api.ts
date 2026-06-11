@@ -1,6 +1,6 @@
 import { collection, doc, getDocs, getDoc, setDoc, addDoc, updateDoc, deleteDoc, query, where, orderBy, onSnapshot, writeBatch } from "firebase/firestore";
 import { db } from "./firebase";
-import type { Tournament, Match, Standing, Team, MatchEvent, VideoProcessingJob, UserProfile, TeamDoc, TeamMember, RegisteredTeam } from "./types";
+import type { Tournament, Match, Standing, Team, MatchEvent, VideoProcessingJob, UserProfile, TeamDoc, TeamMember, RegisteredTeam, MatchPlayer, UserNotification } from "./types";
 
 // Collections
 export const usersCollection = collection(db, "users");
@@ -940,6 +940,7 @@ export const createCasualMatch = async (
     scoreA: 0,
     scoreB: 0,
     events: [],
+    scheduledAt: new Date().toISOString(),
     createdAt: Date.now(),
     teamA: "Team A",
     teamB: "Team B",

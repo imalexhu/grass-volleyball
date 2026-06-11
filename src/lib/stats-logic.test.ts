@@ -26,7 +26,8 @@ describe("Player Stats Computation", () => {
         playersA: [dummyPlayer],
         status: "live",
         scoreA: 5,
-        scoreB: 2
+        scoreB: 2,
+        scheduledAt: ""
       }
     ];
     const stats = computePlayerStats("p1", matches);
@@ -44,6 +45,7 @@ describe("Player Stats Computation", () => {
         status: "complete",
         scoreA: 21,
         scoreB: 15,
+        scheduledAt: "",
         events: [
           { id: "e1", type: "point", team: "A", timestamp: 1000, scoreA: 1, scoreB: 0, isHighlight: true, highlightPlayerId: "p1" },
           { id: "e2", type: "point", team: "B", timestamp: 2000, scoreA: 1, scoreB: 1 }
@@ -58,6 +60,7 @@ describe("Player Stats Computation", () => {
         status: "processed",
         scoreA: 21,
         scoreB: 19, // Team B lost
+        scheduledAt: "",
         events: [
           { id: "e3", type: "point", team: "A", timestamp: 3000, scoreA: 1, scoreB: 0 }
         ]
@@ -90,6 +93,7 @@ describe("Player Stats Computation", () => {
         status: "complete",
         scoreA: 21,
         scoreB: 15,
+        scheduledAt: "",
         events: [
           // p1 active
           { id: "e1", type: "point", team: "A", timestamp: 1000, scoreA: 1, scoreB: 0, rosterA: ["p1", "p2", "p3", "p4"], rosterB: [] },
@@ -107,9 +111,9 @@ describe("Player Stats Computation", () => {
 describe("Team Stats Computation", () => {
   it("computes team wins, plays and win percentages correctly", () => {
     const matches: Match[] = [
-      { id: "m1", teamA: "team_sharks", teamB: "team_jets", status: "complete", scoreA: 21, scoreB: 10 }, // win for sharks
-      { id: "m2", teamA: "team_jets", teamB: "team_sharks", status: "processed", scoreA: 21, scoreB: 19 }, // win for jets (loss for sharks)
-      { id: "m3", teamA: "team_sharks", teamB: "team_other", status: "live", scoreA: 5, scoreB: 0 } // ignored, not complete
+      { id: "m1", teamA: "team_sharks", teamB: "team_jets", status: "complete", scoreA: 21, scoreB: 10, scheduledAt: "" }, // win for sharks
+      { id: "m2", teamA: "team_jets", teamB: "team_sharks", status: "processed", scoreA: 21, scoreB: 19, scheduledAt: "" }, // win for jets (loss for sharks)
+      { id: "m3", teamA: "team_sharks", teamB: "team_other", status: "live", scoreA: 5, scoreB: 0, scheduledAt: "" } // ignored, not complete
     ];
 
     const sharksStats = computeTeamStats("team_sharks", matches);
