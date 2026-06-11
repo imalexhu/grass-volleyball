@@ -889,3 +889,248 @@ export const getTournamentTeams = async (tournamentId: string): Promise<TeamDoc[
   return teams;
 };
 
+// ═══════════════════════════════
+// Casual Match System
+// ═══════════════════════════════
+
+import { generateJoinCode as rawGenerateJoinCode, rotateClockwise } from "./match-logic";
+import { computePlayerStats } from "./stats-logic";
+
+/** Generates a unique 4-character join code that doesn't collide with any active matches. */
+export const generateJoinCode = async (): Promise<string> => {
+  let code = rawGenerateJoinCode();
+  let attempts = 0;
+  while (attempts < 10) {
+    const qA = query(matchesCollection, where("joinCodeA", "==", code));
+    const qB = query(matchesCollection, where("joinCodeB", "==", code));
+    const [snapA, snapB] = await Promise.all([getDocs(qA), getDocs(qB)]);
+    if (snapA.empty && snapB.empty) {
+      return code;
+    }
+    code = rawGenerateJoinCode();
+    attempts++;
+  }
+  return code;
+};
+
+/** Creates a new casual match in setup phase with two unique join codes. */
+export const createCasualMatch = async (
+  adminId: string,
+  config: { label: string; pointTarget: number }
+): Promise<string> => {
+  const joinCodeA = await generateJoinCode();
+  let joinCodeB = await generateJoinCode();
+  while (joinCodeB === joinCodeA) {
+    joinCodeB = await generateJoinCode();
+  }
+
+  const matchData: Omit<Match, "id"> = {
+    label: config.label,
+    createdBy: adminId,
+    joinCodeA,
+    joinCodeB,
+    playersA: [],
+    playersB: [],
+    activeRosterA: [],
+    activeRosterB: [],
+    pointTarget: config.pointTarget,
+    status: "active",
+    phase: "setup",
+    servingTeam: "A",
+    scoreA: 0,
+    scoreB: 0,
+    events: [],
+    createdAt: Date.now(),
+    teamA: "Team A",
+    teamB: "Team B",
+  };
+
+  const docRef = await addDoc(matchesCollection, sanitizeData(matchData));
+  return docRef.id;
+};
+
+/** Finds an active match by join code and determines which team it corresponds to. */
+export const getMatchByJoinCode = async (code: string): Promise<{ match: Match; team: "A" | "B" } | null> => {
+  const upperCode = code.toUpperCase();
+  const qA = query(matchesCollection, where("joinCodeA", "==", upperCode), where("status", "==", "active"));
+  const qB = query(matchesCollection, where("joinCodeB", "==", upperCode), where("status", "==", "active"));
+  
+  const [snapA, snapB] = await Promise.all([getDocs(qA), getDocs(qB)]);
+  
+  if (!snapA.empty) {
+    const doc = snapA.docs[0];
+    return { match: { id: doc.id, ...doc.data() } as Match, team: "A" };
+  }
+  if (!snapB.empty) {
+    const doc = snapB.docs[0];
+    return { match: { id: doc.id, ...doc.data() } as Match, team: "B" };
+  }
+  return null;
+};
+
+/** Adds a player to a team inside an active match using a join code. */
+export const joinMatch = async (joinCode: string, userId: string): Promise<{ matchId: string; team: "A" | "B" }> => {
+  const result = await getMatchByJoinCode(joinCode);
+  if (!result) {
+    throw new Error("Invalid join code or match is not active.");
+  }
+  const { match, team } = result;
+
+  const profile = await getUserProfile(userId);
+  const displayName = profile?.displayName || profile?.email || "Anonymous Player";
+  const photoURL = profile?.organizationLogo || undefined; // Fallback to logo or undefined
+
+  const matchPlayer: MatchPlayer = {
+    userId,
+    displayName,
+    joinedAt: Date.now(),
+    photoURL
+  };
+
+  const matchRef = doc(db, "matches", match.id);
+  
+  if (team === "A") {
+    const alreadyJoined = match.playersA?.some(p => p.userId === userId);
+    if (!alreadyJoined) {
+      const playersA = [...(match.playersA || []), matchPlayer];
+      const activeRosterA = [...(match.activeRosterA || [])];
+      if (activeRosterA.length < 4 && !activeRosterA.includes(userId)) {
+        activeRosterA.push(userId);
+      }
+      await updateDoc(matchRef, sanitizeData({ playersA, activeRosterA }));
+    }
+  } else {
+    const alreadyJoined = match.playersB?.some(p => p.userId === userId);
+    if (!alreadyJoined) {
+      const playersB = [...(match.playersB || []), matchPlayer];
+      const activeRosterB = [...(match.activeRosterB || [])];
+      if (activeRosterB.length < 4 && !activeRosterB.includes(userId)) {
+        activeRosterB.push(userId);
+      }
+      await updateDoc(matchRef, sanitizeData({ playersB, activeRosterB }));
+    }
+  }
+
+  return { matchId: match.id, team };
+};
+
+/** Updates the active 4-player roster list for Team A or Team B. */
+export const setActiveRoster = async (matchId: string, team: "A" | "B", userIds: string[]): Promise<void> => {
+  const matchRef = doc(db, "matches", matchId);
+  if (team === "A") {
+    await updateDoc(matchRef, { activeRosterA: userIds });
+  } else {
+    await updateDoc(matchRef, { activeRosterB: userIds });
+  }
+};
+
+/** Rotates Team A or Team B active roster clockwise. */
+export const rotateTeam = async (matchId: string, team: "A" | "B"): Promise<void> => {
+  const match = await getMatch(matchId);
+  if (!match) throw new Error("Match not found");
+  
+  const matchRef = doc(db, "matches", matchId);
+  if (team === "A") {
+    const roster = match.activeRosterA || [];
+    if (roster.length === 4) {
+      await updateDoc(matchRef, { activeRosterA: rotateClockwise(roster) });
+    }
+  } else {
+    const roster = match.activeRosterB || [];
+    if (roster.length === 4) {
+      await updateDoc(matchRef, { activeRosterB: rotateClockwise(roster) });
+    }
+  }
+};
+
+/** Gets all matches matching a specific status. */
+export const getMatchesByStatus = async (
+  status: "active" | "action_required" | "processed"
+): Promise<Match[]> => {
+  const q = query(matchesCollection, where("status", "==", status));
+  const snap = await getDocs(q);
+  const results = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }) as Match);
+  return results.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+};
+
+/** Fetches all matches a player participated in (either joined as player or in roster). */
+export const getPlayerMatches = async (userId: string): Promise<Match[]> => {
+  const snap = await getDocs(matchesCollection);
+  const results = snap.docs
+    .map(doc => ({ id: doc.id, ...doc.data() }) as Match)
+    .filter(match => 
+      match.playersA?.some(p => p.userId === userId) ||
+      match.playersB?.some(p => p.userId === userId) ||
+      match.activeRosterA?.includes(userId) ||
+      match.activeRosterB?.includes(userId)
+    );
+  return results.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+};
+
+/** Recomputes and updates career stats for a user. */
+export const updatePlayerStats = async (userId: string): Promise<void> => {
+  const matches = await getPlayerMatches(userId);
+  const stats = computePlayerStats(userId, matches);
+  
+  const userRef = doc(usersCollection, userId);
+  await updateDoc(userRef, {
+    matchesPlayed: stats.played,
+    matchesWon: stats.won,
+    highlightsReceived: stats.highlights,
+    pointsPlayed: stats.pointsPlayed,
+  });
+};
+
+// ═══════════════════════════════
+// Notifications System
+// ═══════════════════════════════
+
+/** Creates a notification for a user. */
+export const createNotification = async (
+  userId: string,
+  type: "match_complete" | "video_processed" | "highlight_received",
+  matchId: string,
+  title: string,
+  message: string
+): Promise<string> => {
+  const notification: Omit<UserNotification, "id"> = {
+    userId,
+    type,
+    matchId,
+    title,
+    message,
+    read: false,
+    createdAt: Date.now(),
+  };
+  const docRef = await addDoc(collection(db, "notifications"), sanitizeData(notification));
+  return docRef.id;
+};
+
+/** Retrieves all notifications for a user, sorted newest first. */
+export const getUserNotifications = async (userId: string): Promise<UserNotification[]> => {
+  const q = query(collection(db, "notifications"), where("userId", "==", userId));
+  const snap = await getDocs(q);
+  const results = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }) as UserNotification);
+  return results.sort((a, b) => b.createdAt - a.createdAt);
+};
+
+/** Marks a notification as read. */
+export const markNotificationRead = async (notificationId: string): Promise<void> => {
+  const docRef = doc(db, "notifications", notificationId);
+  await updateDoc(docRef, { read: true });
+};
+
+/** Subscribes to real-time notification updates for a user. */
+export const subscribeToNotifications = (
+  userId: string,
+  callback: (notifications: UserNotification[]) => void
+) => {
+  const q = query(collection(db, "notifications"), where("userId", "==", userId));
+  return onSnapshot(q, (snap) => {
+    const notifications = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }) as UserNotification);
+    notifications.sort((a, b) => b.createdAt - a.createdAt);
+    callback(notifications);
+  });
+};
+
+

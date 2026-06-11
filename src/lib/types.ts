@@ -84,6 +84,13 @@ export interface Tournament {
 // Match / Scoring
 // ═══════════════════════════════
 
+export interface MatchPlayer {
+  userId: string;
+  displayName: string;
+  photoURL?: string;
+  joinedAt: number;
+}
+
 export interface MatchEvent {
   id: string;
   type: "serve" | "point" | "set-finish";
@@ -91,36 +98,79 @@ export interface MatchEvent {
   timestamp: number;
   scoreA: number;
   scoreB: number;
+  servingTeam?: "A" | "B";       // Who served this rally
   isHighlight?: boolean;
+  highlightPlayerId?: string;    // Attributed player (or undefined for match highlight)
+  highlightPlayerName?: string;
+  rosterA?: string[];            // Position snapshot at this event (activeRosterA)
+  rosterB?: string[];            // Position snapshot at this event (activeRosterB)
   setIndex?: number;
 }
 
 export interface Match {
   id: string;
   organizerId?: string;
+  createdBy?: string;             // Admin user ID
   stage?: "pool" | "placement" | "final" | "freeplay";
   pool?: "A" | "B";
-  teamA: string;
+  teamA: string;                  // String ID or team name
   teamB: string;
   court?: number;
-  scheduledAt: string;
+  scheduledAt?: string;
+
+  // ── Join Codes ──
+  joinCodeA?: string;             // 4 capital letters for Team A
+  joinCodeB?: string;             // 4 capital letters for Team B
+
+  // ── Players ──
+  playersA?: MatchPlayer[];       // All players who joined Team A
+  playersB?: MatchPlayer[];       // All players who joined Team B
+  activeRosterA?: string[];       // 4 userIds in position order
+  activeRosterB?: string[];       // 4 userIds in position order
+
+  // ── Scoring Config ──
+  pointTarget?: number;           // First to N (default 21)
+
+  // ── Live State ──
   scoreA?: number;
   scoreB?: number;
   currentSetScoreA?: number;
   currentSetScoreB?: number;
-  status: "scheduled" | "live" | "complete";
-  // Raw upload paths in Firebase Storage (used by Cloud Run processor)
-  rawStoragePathA?: string;
-  rawStoragePathB?: string;
-  // Post-processed YouTube URLs
-  vodUrlA?: string;
-  vodUrlB?: string;
-  matchHighlightsUrl?: string;
+  status: "scheduled" | "live" | "complete" | "active" | "action_required" | "processed";
+  phase?: "setup" | "live" | "complete"; // Sub-state within "active"
+  servingTeam?: "A" | "B";
+  events?: MatchEvent[];
+
+  // ── Video ──
+  rawStoragePathA?: string;       // Firebase Storage path for Camera A
+  rawStoragePathB?: string;       // Firebase Storage path for Camera B
+  videoOffsetA?: number;          // Seconds into raw video where first serve happens
+  videoOffsetB?: number;
+  vodUrlA?: string;               // Deprecated YouTube URL for trimmed Camera A
+  vodUrlB?: string;               // Deprecated YouTube URL for trimmed Camera B
+  vodUrl?: string;                // YouTube URL for trimmed match video (winning team perspective, or fallback)
+  matchHighlightsUrl?: string;    // YouTube URL for combined highlight reel
+  processingJobA?: VideoProcessingJob;
+  processingJobB?: VideoProcessingJob;
+  processingJobHighlights?: VideoProcessingJob;
+  processingJob?: VideoProcessingJob; // Legacy status field
+
+  // ── Metadata ──
+  createdAt?: number;
+  completedAt?: number;
   tournamentId?: string;
   label?: string;
-  events?: MatchEvent[];
-  // Processing job status (embedded for easy UI subscription)
-  processingJob?: VideoProcessingJob;
+}
+
+export interface UserNotification {
+  id: string;
+  userId: string;
+  type: "match_complete" | "video_processed" | "highlight_received";
+  matchId: string;
+  title: string;
+  message: string;
+  read: boolean;
+  createdAt: number;
 }
 
 export type VideoProcessingStatus =

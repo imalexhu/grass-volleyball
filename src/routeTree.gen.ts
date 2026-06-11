@@ -16,9 +16,12 @@ import { Route as PolicyRouteImport } from './routes/policy'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as HomeRouteImport } from './routes/home'
 import { Route as ForgotPasswordRouteImport } from './routes/forgot-password'
+import { Route as TeamsRouteRouteImport } from './routes/teams/route'
 import { Route as ManageRouteRouteImport } from './routes/manage/route'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as TeamsIndexRouteImport } from './routes/teams/index'
 import { Route as ManageIndexRouteImport } from './routes/manage/index'
+import { Route as TeamsTeamIdRouteImport } from './routes/teams/$teamId'
 import { Route as TeamTeamIdRouteImport } from './routes/team.$teamId'
 import { Route as OrgOrgIdRouteImport } from './routes/org.$orgId'
 import { Route as MatchMatchIdRouteImport } from './routes/match.$matchId'
@@ -26,9 +29,6 @@ import { Route as CheckoutSuccessRouteImport } from './routes/checkout.success'
 import { Route as CheckoutCancelRouteImport } from './routes/checkout.cancel'
 import { Route as ManageScoreMatchIdRouteImport } from './routes/manage/score/$matchId'
 import { Route as ManagePostmatchProcessMatchIdRouteImport } from './routes/manage/postmatch-process/$matchId'
-import { Route as TeamsRouteRouteImport } from './routes/teams/route'
-import { Route as TeamsIndexRouteImport } from './routes/teams/index'
-import { Route as TeamsTeamIdRouteImport } from './routes/teams/$teamId'
 
 const TosRoute = TosRouteImport.update({
   id: '/tos',
@@ -65,6 +65,11 @@ const ForgotPasswordRoute = ForgotPasswordRouteImport.update({
   path: '/forgot-password',
   getParentRoute: () => rootRouteImport,
 } as any)
+const TeamsRouteRoute = TeamsRouteRouteImport.update({
+  id: '/teams',
+  path: '/teams',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ManageRouteRoute = ManageRouteRouteImport.update({
   id: '/manage',
   path: '/manage',
@@ -75,10 +80,20 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const TeamsIndexRoute = TeamsIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => TeamsRouteRoute,
+} as any)
 const ManageIndexRoute = ManageIndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => ManageRouteRoute,
+} as any)
+const TeamsTeamIdRoute = TeamsTeamIdRouteImport.update({
+  id: '/$teamId',
+  path: '/$teamId',
+  getParentRoute: () => TeamsRouteRoute,
 } as any)
 const TeamTeamIdRoute = TeamTeamIdRouteImport.update({
   id: '/team/$teamId',
@@ -117,27 +132,10 @@ const ManagePostmatchProcessMatchIdRoute =
     getParentRoute: () => ManageRouteRoute,
   } as any)
 
-const TeamsRouteRoute = TeamsRouteRouteImport.update({
-  id: '/teams',
-  path: '/teams',
-  getParentRoute: () => rootRouteImport,
-} as any)
-
-const TeamsIndexRoute = TeamsIndexRouteImport.update({
-  id: '/',
-  path: '/',
-  getParentRoute: () => TeamsRouteRoute,
-} as any)
-
-const TeamsTeamIdRoute = TeamsTeamIdRouteImport.update({
-  id: '/$teamId',
-  path: '/$teamId',
-  getParentRoute: () => TeamsRouteRoute,
-} as any)
-
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/manage': typeof ManageRouteRouteWithChildren
+  '/teams': typeof TeamsRouteRouteWithChildren
   '/forgot-password': typeof ForgotPasswordRoute
   '/home': typeof HomeRoute
   '/login': typeof LoginRoute
@@ -150,12 +148,11 @@ export interface FileRoutesByFullPath {
   '/match/$matchId': typeof MatchMatchIdRoute
   '/org/$orgId': typeof OrgOrgIdRoute
   '/team/$teamId': typeof TeamTeamIdRoute
+  '/teams/$teamId': typeof TeamsTeamIdRoute
   '/manage/': typeof ManageIndexRoute
+  '/teams/': typeof TeamsIndexRoute
   '/manage/postmatch-process/$matchId': typeof ManagePostmatchProcessMatchIdRoute
   '/manage/score/$matchId': typeof ManageScoreMatchIdRoute
-  '/teams': typeof TeamsRouteRouteWithChildren
-  '/teams/': typeof TeamsIndexRoute
-  '/teams/$teamId': typeof TeamsTeamIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -171,16 +168,17 @@ export interface FileRoutesByTo {
   '/match/$matchId': typeof MatchMatchIdRoute
   '/org/$orgId': typeof OrgOrgIdRoute
   '/team/$teamId': typeof TeamTeamIdRoute
+  '/teams/$teamId': typeof TeamsTeamIdRoute
   '/manage': typeof ManageIndexRoute
+  '/teams': typeof TeamsIndexRoute
   '/manage/postmatch-process/$matchId': typeof ManagePostmatchProcessMatchIdRoute
   '/manage/score/$matchId': typeof ManageScoreMatchIdRoute
-  '/teams': typeof TeamsIndexRoute
-  '/teams/$teamId': typeof TeamsTeamIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/manage': typeof ManageRouteRouteWithChildren
+  '/teams': typeof TeamsRouteRouteWithChildren
   '/forgot-password': typeof ForgotPasswordRoute
   '/home': typeof HomeRoute
   '/login': typeof LoginRoute
@@ -193,18 +191,18 @@ export interface FileRoutesById {
   '/match/$matchId': typeof MatchMatchIdRoute
   '/org/$orgId': typeof OrgOrgIdRoute
   '/team/$teamId': typeof TeamTeamIdRoute
+  '/teams/$teamId': typeof TeamsTeamIdRoute
   '/manage/': typeof ManageIndexRoute
+  '/teams/': typeof TeamsIndexRoute
   '/manage/postmatch-process/$matchId': typeof ManagePostmatchProcessMatchIdRoute
   '/manage/score/$matchId': typeof ManageScoreMatchIdRoute
-  '/teams': typeof TeamsRouteRouteWithChildren
-  '/teams/': typeof TeamsIndexRoute
-  '/teams/$teamId': typeof TeamsTeamIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
     | '/manage'
+    | '/teams'
     | '/forgot-password'
     | '/home'
     | '/login'
@@ -217,12 +215,11 @@ export interface FileRouteTypes {
     | '/match/$matchId'
     | '/org/$orgId'
     | '/team/$teamId'
+    | '/teams/$teamId'
     | '/manage/'
+    | '/teams/'
     | '/manage/postmatch-process/$matchId'
     | '/manage/score/$matchId'
-    | '/teams'
-    | '/teams/'
-    | '/teams/$teamId'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -238,15 +235,16 @@ export interface FileRouteTypes {
     | '/match/$matchId'
     | '/org/$orgId'
     | '/team/$teamId'
+    | '/teams/$teamId'
     | '/manage'
+    | '/teams'
     | '/manage/postmatch-process/$matchId'
     | '/manage/score/$matchId'
-    | '/teams'
-    | '/teams/$teamId'
   id:
     | '__root__'
     | '/'
     | '/manage'
+    | '/teams'
     | '/forgot-password'
     | '/home'
     | '/login'
@@ -259,17 +257,17 @@ export interface FileRouteTypes {
     | '/match/$matchId'
     | '/org/$orgId'
     | '/team/$teamId'
+    | '/teams/$teamId'
     | '/manage/'
+    | '/teams/'
     | '/manage/postmatch-process/$matchId'
     | '/manage/score/$matchId'
-    | '/teams'
-    | '/teams/'
-    | '/teams/$teamId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   ManageRouteRoute: typeof ManageRouteRouteWithChildren
+  TeamsRouteRoute: typeof TeamsRouteRouteWithChildren
   ForgotPasswordRoute: typeof ForgotPasswordRoute
   HomeRoute: typeof HomeRoute
   LoginRoute: typeof LoginRoute
@@ -282,7 +280,6 @@ export interface RootRouteChildren {
   MatchMatchIdRoute: typeof MatchMatchIdRoute
   OrgOrgIdRoute: typeof OrgOrgIdRoute
   TeamTeamIdRoute: typeof TeamTeamIdRoute
-  TeamsRouteRoute: typeof TeamsRouteRouteWithChildren
 }
 
 declare module '@tanstack/react-router' {
@@ -336,6 +333,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ForgotPasswordRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/teams': {
+      id: '/teams'
+      path: '/teams'
+      fullPath: '/teams'
+      preLoaderRoute: typeof TeamsRouteRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/manage': {
       id: '/manage'
       path: '/manage'
@@ -350,12 +354,26 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/teams/': {
+      id: '/teams/'
+      path: '/'
+      fullPath: '/teams/'
+      preLoaderRoute: typeof TeamsIndexRouteImport
+      parentRoute: typeof TeamsRouteRoute
+    }
     '/manage/': {
       id: '/manage/'
       path: '/'
       fullPath: '/manage/'
       preLoaderRoute: typeof ManageIndexRouteImport
       parentRoute: typeof ManageRouteRoute
+    }
+    '/teams/$teamId': {
+      id: '/teams/$teamId'
+      path: '/$teamId'
+      fullPath: '/teams/$teamId'
+      preLoaderRoute: typeof TeamsTeamIdRouteImport
+      parentRoute: typeof TeamsRouteRoute
     }
     '/team/$teamId': {
       id: '/team/$teamId'
@@ -406,43 +424,8 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ManagePostmatchProcessMatchIdRouteImport
       parentRoute: typeof ManageRouteRoute
     }
-    '/teams': {
-      id: '/teams'
-      path: '/teams'
-      fullPath: '/teams'
-      preLoaderRoute: typeof TeamsRouteRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/teams/': {
-      id: '/teams/'
-      path: '/'
-      fullPath: '/teams/'
-      preLoaderRoute: typeof TeamsIndexRouteImport
-      parentRoute: typeof TeamsRouteRoute
-    }
-    '/teams/$teamId': {
-      id: '/teams/$teamId'
-      path: '/$teamId'
-      fullPath: '/teams/$teamId'
-      preLoaderRoute: typeof TeamsTeamIdRouteImport
-      parentRoute: typeof TeamsRouteRoute
-    }
   }
 }
-
-interface TeamsRouteRouteChildren {
-  TeamsIndexRoute: typeof TeamsIndexRoute
-  TeamsTeamIdRoute: typeof TeamsTeamIdRoute
-}
-
-const TeamsRouteRouteChildren: TeamsRouteRouteChildren = {
-  TeamsIndexRoute: TeamsIndexRoute,
-  TeamsTeamIdRoute: TeamsTeamIdRoute,
-}
-
-const TeamsRouteRouteWithChildren = TeamsRouteRoute._addFileChildren(
-  TeamsRouteRouteChildren,
-)
 
 interface ManageRouteRouteChildren {
   ManageIndexRoute: typeof ManageIndexRoute
@@ -460,9 +443,24 @@ const ManageRouteRouteWithChildren = ManageRouteRoute._addFileChildren(
   ManageRouteRouteChildren,
 )
 
+interface TeamsRouteRouteChildren {
+  TeamsTeamIdRoute: typeof TeamsTeamIdRoute
+  TeamsIndexRoute: typeof TeamsIndexRoute
+}
+
+const TeamsRouteRouteChildren: TeamsRouteRouteChildren = {
+  TeamsTeamIdRoute: TeamsTeamIdRoute,
+  TeamsIndexRoute: TeamsIndexRoute,
+}
+
+const TeamsRouteRouteWithChildren = TeamsRouteRoute._addFileChildren(
+  TeamsRouteRouteChildren,
+)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   ManageRouteRoute: ManageRouteRouteWithChildren,
+  TeamsRouteRoute: TeamsRouteRouteWithChildren,
   ForgotPasswordRoute: ForgotPasswordRoute,
   HomeRoute: HomeRoute,
   LoginRoute: LoginRoute,
@@ -475,7 +473,6 @@ const rootRouteChildren: RootRouteChildren = {
   MatchMatchIdRoute: MatchMatchIdRoute,
   OrgOrgIdRoute: OrgOrgIdRoute,
   TeamTeamIdRoute: TeamTeamIdRoute,
-  TeamsRouteRoute: TeamsRouteRouteWithChildren,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

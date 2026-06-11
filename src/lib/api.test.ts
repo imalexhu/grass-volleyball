@@ -681,3 +681,134 @@ describe("Delete Tournament (deleteTournament)", () => {
     expect(batch.commit).toHaveBeenCalled();
   });
 });
+
+// ─────────────────────────────────────
+// 7. Casual Match System API Tests
+// ─────────────────────────────────────
+describe("Casual Match System API", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("createCasualMatch generates two unique join codes and creates the document", async () => {
+    mockGetDocs.mockResolvedValue(snapList()); // No collision mock
+    mockAddDoc.mockResolvedValue({ id: "match-casual-1" });
+
+    const { createCasualMatch } = await import("./api");
+    const matchId = await createCasualMatch("admin-123", { label: "Test Game", pointTarget: 21 });
+
+    expect(matchId).toBe("match-casual-1");
+    expect(mockAddDoc).toHaveBeenCalledWith(
+      expect.objectContaining({ _name: "matches" }),
+      expect.objectContaining({
+        label: "Test Game",
+        createdBy: "admin-123",
+        pointTarget: 21,
+        status: "active",
+        phase: "setup"
+      })
+    );
+  });
+
+  it("getMatchByJoinCode searches both join codes", async () => {
+    // Mock getDocs to return match when querying team A
+    mockGetDocs
+      .mockResolvedValueOnce(snapList(snap({ label: "Game A", joinCodeA: "BVKR", status: "active" }, "match-1"))) // Team A search finds match
+      .mockResolvedValueOnce(snapList()); // Team B search empty
+
+    const { getMatchByJoinCode } = await import("./api");
+    const result = await getMatchByJoinCode("BVKR");
+
+    expect(result).not.toBeNull();
+    expect(result?.team).toBe("A");
+    expect(result?.match.label).toBe("Game A");
+  });
+
+  it("joinMatch adds player to players list and active roster", async () => {
+    // Mock getMatchByJoinCode: Team A
+    mockGetDocs
+      .mockResolvedValueOnce(snapList(snap({ id: "match-1", label: "Game 1", joinCodeA: "BVKR", status: "active", playersA: [], activeRosterA: [] }, "match-1")))
+      .mockResolvedValueOnce(snapList());
+
+    // Mock getUserProfile
+    mockGetDoc.mockResolvedValue(
+      snap({
+        displayName: "Fardeen",
+        email: "fardeen@test.com"
+      }, "user-123")
+    );
+
+    const { joinMatch } = await import("./api");
+    const result = await joinMatch("BVKR", "user-123");
+
+    expect(result.matchId).toBe("match-1");
+    expect(result.team).toBe("A");
+
+    expect(mockUpdateDoc).toHaveBeenCalledWith(
+      expect.any(Object),
+      expect.objectContaining({
+        playersA: expect.arrayContaining([
+          expect.objectContaining({ userId: "user-123", displayName: "Fardeen" })
+        ]),
+        activeRosterA: expect.arrayContaining(["user-123"])
+      })
+    );
+  });
+
+  it("updatePlayerStats computes stats and updates user profile", async () => {
+    // Mock getDocs for getPlayerMatches (returns all matches in DB, one complete match where user is on team A and won)
+    mockGetDocs.mockResolvedValue(
+      snapList(
+        snap({
+          status: "complete",
+          scoreA: 21,
+          scoreB: 15,
+          playersA: [{ userId: "user-123", displayName: "Fardeen" }],
+          activeRosterA: ["user-123", "p2", "p3", "p4"],
+          events: [
+            { type: "point", team: "A", isHighlight: true, highlightPlayerId: "user-123" },
+            { type: "point", team: "B" }
+          ]
+        }, "match-1")
+      )
+    );
+
+    const { updatePlayerStats } = await import("./api");
+    await updatePlayerStats("user-123");
+
+    expect(mockUpdateDoc).toHaveBeenCalledWith(
+      expect.any(Object),
+      expect.objectContaining({
+        matchesPlayed: 1,
+        matchesWon: 1,
+        highlightsReceived: 1,
+        pointsPlayed: 2
+      })
+    );
+  });
+
+  it("creates and retrieves notifications successfully", async () => {
+    mockAddDoc.mockResolvedValue({ id: "notif-1" });
+    mockGetDocs.mockResolvedValue(
+      snapList(
+        snap({
+          userId: "user-123",
+          type: "highlight_received",
+          matchId: "m1",
+          title: "New Highlight",
+          message: "You got a highlight!",
+          read: false,
+          createdAt: 1000
+        }, "notif-1")
+      )
+    );
+
+    const { createNotification, getUserNotifications } = await import("./api");
+    const notifId = await createNotification("user-123", "highlight_received", "m1", "New Highlight", "You got a highlight!");
+    expect(notifId).toBe("notif-1");
+
+    const list = await getUserNotifications("user-123");
+    expect(list).toHaveLength(1);
+    expect(list[0].title).toBe("New Highlight");
+  });
+});
