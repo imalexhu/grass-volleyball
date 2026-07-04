@@ -5,11 +5,13 @@ import {
   signOut, 
   GoogleAuthProvider, 
   OAuthProvider, 
-  signInWithPopup 
+  signInWithRedirect,
+  getRedirectResult
 } from "firebase/auth";
 import { auth } from "@/lib/firebase";
 import { getUserProfile, createUserProfile } from "@/lib/api";
 import type { UserProfile } from "@/lib/types";
+import { toast } from "sonner";
 
 interface AuthContextType {
   user: User | null;
@@ -28,6 +30,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    // Handle redirect sign-in result on load
+    getRedirectResult(auth)
+      .catch((error) => {
+        console.error("Error in getRedirectResult:", error);
+        toast.error("Sign in failed: " + error.message);
+      });
+
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       try {
         setUser(user);
@@ -62,12 +71,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signInWithGoogle = async () => {
     const provider = new GoogleAuthProvider();
-    await signInWithPopup(auth, provider);
+    await signInWithRedirect(auth, provider);
   };
 
   const signInWithApple = async () => {
     const provider = new OAuthProvider("apple.com");
-    await signInWithPopup(auth, provider);
+    await signInWithRedirect(auth, provider);
   };
 
   return (
