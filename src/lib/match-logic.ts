@@ -21,13 +21,15 @@ export function isValidJoinCode(code: string): boolean {
 }
 
 /**
- * Rotates a 4-player roster clockwise.
- * The player in position 4 (index 3) moves to position 1 (index 0) and becomes the server.
- * Input: [pos1, pos2, pos3, pos4] -> Output: [pos4, pos1, pos2, pos3]
+ * Rotates a roster clockwise.
+ * The last player moves to position 1 (index 0) and becomes the server.
+ * Input: [pos1, pos2, ...] -> Output: [posLast, pos1, pos2, ...]
  */
 export function rotateClockwise(roster: string[]): string[] {
-  if (roster.length !== 4) return roster;
-  return [roster[3], roster[0], roster[1], roster[2]];
+  if (roster.length <= 1) return roster;
+  const last = roster[roster.length - 1];
+  const rest = roster.slice(0, roster.length - 1);
+  return [last, ...rest];
 }
 
 /**
@@ -99,10 +101,10 @@ export function applyPointResult(state: ScoringState, scoringTeam: "A" | "B"): S
   if (sideOut) {
     if (scoringTeam === "A") {
       const rotated = rotateClockwise(nextRosterA);
-      nextRosterA.splice(0, 4, ...rotated);
+      nextRosterA.splice(0, nextRosterA.length, ...rotated);
     } else {
       const rotated = rotateClockwise(nextRosterB);
-      nextRosterB.splice(0, 4, ...rotated);
+      nextRosterB.splice(0, nextRosterB.length, ...rotated);
     }
   }
 

@@ -1,30 +1,20 @@
 /**
  * Grass Volleyball — Cloud Run Video Processor
  *
- * Receives POST /process  { jobId, matchId, perspective, rawStoragePath }
+ * Receives POST /process  { jobId, matchId, perspectiveA, perspectiveB, winner, events }
  * Pipeline:
- *   1. Download raw video from Firebase Storage → /tmp/{jobId}/raw.mp4
- *   2. Fetch match events from Firestore
- *   3. Build FFmpeg concat + filtergraph for ALL rallies  → trimmed.mp4
- *   4. Upload trimmed.mp4 to YouTube (unlisted)
- *   5. Build FFmpeg concat + filtergraph for HIGHLIGHT rallies → highlights.mp4
- *   6. Upload highlights.mp4 to YouTube (unlisted)
- *   7. Update Firestore job + match documents
- *   8. Clean up /tmp
- *
- * Environment variables required:
- *   FIREBASE_SERVICE_ACCOUNT   Base64-encoded service account JSON
- *   FIREBASE_STORAGE_BUCKET    e.g. "my-project.appspot.com"
- *   YOUTUBE_CLIENT_ID
- *   YOUTUBE_CLIENT_SECRET
- *   YOUTUBE_REFRESH_TOKEN
- *   PORT                       (optional, default 8080)
+ *   1. Download raw video(s) from Firebase Storage → /tmp/{jobId}/raw_A.mp4, raw_B.mp4
+ *   2. Determine winning perspective and generate the Full Match VOD
+ *   3. Generate combined highlights reel alternating perspectives when both are available
+ *   4. Upload both to YouTube (unlisted)
+ *   5. Update Firestore matches + job documents, and create user notifications
+ *   6. Clean up /tmp
  */
 
 import express, { Request, Response } from "express";
 import { initializeApp, cert, App } from "firebase-admin/app";
-import { getFirestore, Firestore } from "firebase-admin/firestore";
-import { getStorage, Storage } from "firebase-admin/storage";
+import { getFirestore } from "firebase-admin/firestore";
+import { getStorage } from "firebase-admin/storage";
 import { google, youtube_v3 } from "googleapis";
 import fs from "fs";
 import path from "path";
@@ -34,7 +24,6 @@ import { promisify } from "util";
 const execAsync = promisify(exec);
 
 // ─── Startup env check (warn, don't crash) ────────────────────────────────────
-
 function checkEnv() {
   const required = [
     "FIREBASE_STORAGE_BUCKET",
@@ -53,7 +42,6 @@ function checkEnv() {
 }
 
 // ─── Firebase Admin — lazy singleton ─────────────────────────────────────────
-
 let _db: ReturnType<typeof getFirestore> | null = null;
 let _storage: ReturnType<typeof getStorage> | null = null;
 
@@ -69,7 +57,6 @@ function getFirebaseClients() {
     const serviceAccount = JSON.parse(Buffer.from(serviceAccountB64, "base64").toString("utf8"));
     app = initializeApp({ credential: cert(serviceAccount), storageBucket: bucket });
   } else {
-    // Use Application Default Credentials (automatic in Cloud Run)
     console.log("[Firebase] Using Application Default Credentials");
     app = initializeApp({ storageBucket: bucket });
   }
@@ -80,7 +67,6 @@ function getFirebaseClients() {
 }
 
 // ─── YouTube client ──────────────────────────────────────────────────────────
-
 function getYouTubeClient(): youtube_v3.Youtube {
   const clientId = process.env.YOUTUBE_CLIENT_ID;
   const clientSecret = process.env.YOUTUBE_CLIENT_SECRET;
@@ -94,11 +80,6 @@ function getYouTubeClient(): youtube_v3.Youtube {
 }
 
 // ─── Types ───────────────────────────────────────────────────────────────────
-
-type VideoProcessingStatus =
-  | "queued" | "downloading" | "trimming" | "uploading_trimmed"
-  | "creating_highlights" | "uploading_highlights" | "complete" | "error";
-
 interface MatchEvent {
   id: string;
   type: "serve" | "point" | "set-finish";
@@ -107,18 +88,28 @@ interface MatchEvent {
   scoreA: number;
   scoreB: number;
   isHighlight?: boolean;
-  setIndex?: number;
+}
+
+interface CameraConfig {
+  rawStoragePath: string;
+  videoOffset: number;
 }
 
 interface ProcessRequest {
   jobId: string;
   matchId: string;
-  perspective: "A" | "B";
-  rawStoragePath: string;
+  perspectiveA?: CameraConfig;
+  perspectiveB?: CameraConfig;
+  winner: "A" | "B";
+  events: MatchEvent[];
+}
+
+interface RallySegment {
+  serve: MatchEvent;
+  point: MatchEvent;
 }
 
 // ─── Firestore helpers ───────────────────────────────────────────────────────
-
 async function updateJob(jobId: string, data: Record<string, unknown>) {
   const { db } = getFirebaseClients();
   await db.collection("processingJobs").doc(jobId).set(
@@ -136,16 +127,6 @@ async function updateMatchJob(matchId: string, data: Record<string, unknown>) {
 }
 
 // ─── FFmpeg helpers ──────────────────────────────────────────────────────────
-
-interface RallySegment {
-  serve: MatchEvent;
-  point: MatchEvent;
-}
-
-/**
- * Given match events, return rallies (serve→point pairs).
- * If highlightOnly=true, only include rallies where the point is a highlight.
- */
 function extractRallies(events: MatchEvent[], highlightOnly = false): RallySegment[] {
   const rallies: RallySegment[] = [];
   let currentServe: MatchEvent | null = null;
@@ -163,26 +144,22 @@ function extractRallies(events: MatchEvent[], highlightOnly = false): RallySegme
   return rallies;
 }
 
-/**
- * Build FFmpeg concat_list and filtergraph for a set of rally segments.
- * rawVideoPath must be an absolute path.
- */
 function buildFFmpegInputs(
   rallies: RallySegment[],
   rawVideoPath: string,
-  firstServeTimestamp: number
+  firstServeTimestamp: number,
+  videoOffset: number
 ): { concatList: string; filterGraph: string } {
   let concatList = "";
   const drawtextParts: string[] = [];
   let currentFinalTime = 0;
 
   for (const rally of rallies) {
-    let startSec = (rally.serve.timestamp - firstServeTimestamp) / 1000 - 2;
+    let startSec = videoOffset + (rally.serve.timestamp - firstServeTimestamp) / 1000 - 2;
     if (startSec < 0) startSec = 0;
-    const endSec = (rally.point.timestamp - firstServeTimestamp) / 1000 + 2;
+    const endSec = videoOffset + (rally.point.timestamp - firstServeTimestamp) / 1000 + 2;
     const duration = endSec - startSec;
 
-    // Escape single quotes in path (defensive)
     const escapedPath = rawVideoPath.replace(/'/g, "'\\''");
     concatList += `file '${escapedPath}'\n`;
     concatList += `inpoint ${startSec.toFixed(3)}\n`;
@@ -201,7 +178,7 @@ function buildFFmpegInputs(
   return { concatList, filterGraph };
 }
 
-async function runFFmpeg(
+async function runFFmpegConcat(
   concatListPath: string,
   filterGraphPath: string,
   outputPath: string
@@ -216,14 +193,39 @@ async function runFFmpeg(
     `"${outputPath}"`,
   ].join(" ");
 
-  console.log("[FFmpeg] Running:", cmd);
+  console.log("[FFmpeg] Concat running:", cmd);
+  const { stdout, stderr } = await execAsync(cmd);
+  if (stdout) console.log("[FFmpeg stdout]", stdout);
+  if (stderr) console.log("[FFmpeg stderr]", stderr);
+}
+
+// Transcode a single trimmed segment to uniform specs (1280x720, 30fps, 44.1kHz AAC)
+async function transcodeHighlightSegment(
+  inputPath: string,
+  outputPath: string,
+  startSec: number,
+  duration: number,
+  scoreText: string
+): Promise<void> {
+  const cmd = [
+    "ffmpeg -y",
+    `-ss ${startSec.toFixed(3)}`,
+    `-t ${duration.toFixed(3)}`,
+    `-i "${inputPath}"`,
+    `-vf "scale=1280:720,drawtext=text='${scoreText}':fontsize=48:fontcolor=white:box=1:boxcolor=black@0.5:boxborderw=10:x=(w-text_w)/2:y=50"`,
+    `-c:v libx264 -preset fast -crf 22`,
+    `-c:a aac -b:a 128k -ar 44100`,
+    `-r 30`,
+    `"${outputPath}"`,
+  ].join(" ");
+
+  console.log("[FFmpeg] Transcode segment running:", cmd);
   const { stdout, stderr } = await execAsync(cmd);
   if (stdout) console.log("[FFmpeg stdout]", stdout);
   if (stderr) console.log("[FFmpeg stderr]", stderr);
 }
 
 // ─── YouTube upload ──────────────────────────────────────────────────────────
-
 async function uploadToYouTube(
   filePath: string,
   title: string,
@@ -260,162 +262,259 @@ async function uploadToYouTube(
 }
 
 // ─── Core pipeline ───────────────────────────────────────────────────────────
-
 async function runPipeline(req: ProcessRequest): Promise<void> {
-  const { jobId, matchId, perspective, rawStoragePath } = req;
+  const { jobId, matchId, perspectiveA, perspectiveB, winner, events } = req;
   const tmpDir = `/tmp/${jobId}`;
   fs.mkdirSync(tmpDir, { recursive: true });
 
-  const jobBase = { id: jobId, matchId, perspective, rawStoragePath };
-
+  const jobBase = { id: jobId, matchId, status: "queued", progress: 0 };
   const { db, storage } = getFirebaseClients();
 
   try {
-    // ── 1. Download raw video ─────────────────────────────────────────────
+    // ── 1. Download raw videos ────────────────────────────────────────────
     await updateJob(jobId, { status: "downloading", progress: 5 });
     await updateMatchJob(matchId, { ...jobBase, status: "downloading", progress: 5 });
 
-    const rawPath = path.join(tmpDir, "raw.mp4");
-    console.log(`[Pipeline] Downloading ${rawStoragePath} → ${rawPath}`);
-    await storage.bucket().file(rawStoragePath).download({ destination: rawPath });
-    console.log("[Pipeline] Download complete");
+    let rawPathA = "";
+    let rawPathB = "";
 
-    // ── 2. Fetch match events from Firestore ──────────────────────────────
+    if (perspectiveA?.rawStoragePath) {
+      rawPathA = path.join(tmpDir, "raw_A.mp4");
+      console.log(`[Pipeline] Downloading Camera A ${perspectiveA.rawStoragePath} → ${rawPathA}`);
+      await storage.bucket().file(perspectiveA.rawStoragePath).download({ destination: rawPathA });
+    }
+
+    if (perspectiveB?.rawStoragePath) {
+      rawPathB = path.join(tmpDir, "raw_B.mp4");
+      console.log(`[Pipeline] Downloading Camera B ${perspectiveB.rawStoragePath} → ${rawPathB}`);
+      await storage.bucket().file(perspectiveB.rawStoragePath).download({ destination: rawPathB });
+    }
+
+    if (!rawPathA && !rawPathB) {
+      throw new Error("No raw videos downloaded successfully.");
+    }
+
+    const firstServe = events.find((e) => e.type === "serve");
+    if (!firstServe) throw new Error("No serve event found — cannot align timestamps");
+    const firstServeTimestamp = firstServe.timestamp;
+
+    // Fetch match label
     const matchSnap = await db.collection("matches").doc(matchId).get();
-    if (!matchSnap.exists) throw new Error(`Match ${matchId} not found`);
-    const events: MatchEvent[] = (matchSnap.data()?.events || []) as MatchEvent[];
+    const matchData = matchSnap.data() || {};
+    const matchLabel = matchData.label || "Casual Match";
+    const teamA = matchData.teamA || "Team A";
+    const teamB = matchData.teamB || "Team B";
 
-    if (events.length === 0) throw new Error("Match has no recorded events");
-
-    const firstServe = events.find(e => e.type === "serve");
-    if (!firstServe) throw new Error("No serve event found — cannot compute timestamps");
-
-    // ── 3. Trim all rallies ───────────────────────────────────────────────
+    // ── 2. Determine and Trim Full Match VOD ──────────────────────────────
     await updateJob(jobId, { status: "trimming", progress: 20 });
     await updateMatchJob(matchId, { ...jobBase, status: "trimming", progress: 20 });
 
-    const allRallies = extractRallies(events);
-    console.log(`[Pipeline] ${allRallies.length} rallies found`);
+    // Try winning team perspective first; fallback to whatever is available
+    let chosenCam: CameraConfig;
+    let chosenPath: string;
+    let chosenPerspective: "A" | "B";
 
-    const { concatList, filterGraph } = buildFFmpegInputs(allRallies, rawPath, firstServe.timestamp);
+    if (winner === "A" && rawPathA) {
+      chosenCam = perspectiveA!;
+      chosenPath = rawPathA;
+      chosenPerspective = "A";
+    } else if (winner === "B" && rawPathB) {
+      chosenCam = perspectiveB!;
+      chosenPath = rawPathB;
+      chosenPerspective = "B";
+    } else {
+      // Fallback
+      if (rawPathA) {
+        chosenCam = perspectiveA!;
+        chosenPath = rawPathA;
+        chosenPerspective = "A";
+      } else {
+        chosenCam = perspectiveB!;
+        chosenPath = rawPathB;
+        chosenPerspective = "B";
+      }
+    }
+
+    console.log(`[Pipeline] Trimming Match VOD using Perspective ${chosenPerspective}`);
+    const allRallies = extractRallies(events);
+    const { concatList, filterGraph } = buildFFmpegInputs(
+      allRallies,
+      chosenPath,
+      firstServeTimestamp,
+      chosenCam.videoOffset
+    );
+
     const concatListPath = path.join(tmpDir, "concat_all.txt");
     const filterGraphPath = path.join(tmpDir, "filtergraph_all.txt");
     fs.writeFileSync(concatListPath, concatList);
     fs.writeFileSync(filterGraphPath, filterGraph);
 
     const trimmedPath = path.join(tmpDir, "trimmed.mp4");
-    await runFFmpeg(concatListPath, filterGraphPath, trimmedPath);
-    console.log("[Pipeline] Trimmed video created");
+    await runFFmpegConcat(concatListPath, filterGraphPath, trimmedPath);
+    console.log("[Pipeline] Trimmed VOD created");
 
-    // ── 4. Upload trimmed to YouTube ──────────────────────────────────────
+    // ── 3. Upload trimmed VOD to YouTube ──────────────────────────────────
     await updateJob(jobId, { status: "uploading_trimmed", progress: 50 });
     await updateMatchJob(matchId, { ...jobBase, status: "uploading_trimmed", progress: 50 });
 
-    const matchData = matchSnap.data()!;
-    const teamA = matchData.teamA as string;
-    const teamB = matchData.teamB as string;
-
     const trimmedUrl = await uploadToYouTube(
       trimmedPath,
-      `[Trimmed] ${teamA} vs ${teamB} — Perspective ${perspective}`,
-      `Full match VOD (trimmed rallies only). Recorded at the ${matchData.stage ?? ""} stage.`
+      `${matchLabel} — Full Match`,
+      `Full trimmed rallies from winning team perspective (${chosenPerspective}).`
     );
-    await updateJob(jobId, { trimmedYoutubeUrl: trimmedUrl, progress: 65 });
-    const { db: db2 } = getFirebaseClients();
-    await db2.collection("matches").doc(matchId).update({
-      [`vodUrl${perspective}`]: trimmedUrl,
-      processingJob: { ...jobBase, status: "uploading_trimmed", progress: 65, trimmedYoutubeUrl: trimmedUrl },
+
+    // Save VOD Url to Match
+    await db.collection("matches").doc(matchId).update({
+      vodUrl: trimmedUrl,
     });
 
-    // ── 5. Build highlights ───────────────────────────────────────────────
+    // ── 4. Generate combined highlights reel ──────────────────────────────
     const highlightRallies = extractRallies(events, true);
-    console.log(`[Pipeline] ${highlightRallies.length} highlight rallies`);
+    console.log(`[Pipeline] Found ${highlightRallies.length} highlight rallies.`);
 
     let highlightsUrl: string | null = null;
 
     if (highlightRallies.length > 0) {
       await updateJob(jobId, { status: "creating_highlights", progress: 70 });
-      await updateMatchJob(matchId, { ...jobBase, status: "creating_highlights", progress: 70, trimmedYoutubeUrl: trimmedUrl });
+      await updateMatchJob(matchId, { ...jobBase, status: "creating_highlights", progress: 70 });
 
-      const { concatList: hlConcat, filterGraph: hlFilter } = buildFFmpegInputs(
-        highlightRallies, rawPath, firstServe.timestamp
-      );
-      const hlConcatPath  = path.join(tmpDir, "concat_hl.txt");
-      const hlFilterPath  = path.join(tmpDir, "filtergraph_hl.txt");
-      const hlOutputPath  = path.join(tmpDir, "highlights.mp4");
-      fs.writeFileSync(hlConcatPath, hlConcat);
-      fs.writeFileSync(hlFilterPath, hlFilter);
-      await runFFmpeg(hlConcatPath, hlFilterPath, hlOutputPath);
-      console.log("[Pipeline] Highlights video created");
+      const segmentPaths: string[] = [];
 
-      // ── 6. Upload highlights to YouTube ──────────────────────────────────
+      for (let i = 0; i < highlightRallies.length; i++) {
+        const rally = highlightRallies[i];
+        const scoringTeam = rally.point.team || "A";
+
+        // Alternate camera depending on scoring team, falling back to single if needed
+        let hlCam: CameraConfig;
+        let hlPath: string;
+
+        if (scoringTeam === "A" && rawPathA) {
+          hlCam = perspectiveA!;
+          hlPath = rawPathA;
+        } else if (scoringTeam === "B" && rawPathB) {
+          hlCam = perspectiveB!;
+          hlPath = rawPathB;
+        } else {
+          hlCam = rawPathA ? perspectiveA! : perspectiveB!;
+          hlPath = rawPathA ? rawPathA : rawPathB;
+        }
+
+        let startSec = hlCam.videoOffset + (rally.serve.timestamp - firstServeTimestamp) / 1000 - 2;
+        if (startSec < 0) startSec = 0;
+        const endSec = hlCam.videoOffset + (rally.point.timestamp - firstServeTimestamp) / 1000 + 2;
+        const duration = endSec - startSec;
+
+        const segmentPath = path.join(tmpDir, `hl_segment_${i}.mp4`);
+        const scoreText = `${rally.point.scoreA} - ${rally.point.scoreB}`;
+
+        await transcodeHighlightSegment(hlPath, segmentPath, startSec, duration, scoreText);
+        segmentPaths.push(segmentPath);
+      }
+
+      // Create concat list of segment files
+      const hlConcatListPath = path.join(tmpDir, "concat_hl.txt");
+      let hlConcatStr = "";
+      for (const segPath of segmentPaths) {
+        hlConcatStr += `file '${segPath.replace(/'/g, "'\\''")}'\n`;
+      }
+      fs.writeFileSync(hlConcatListPath, hlConcatStr);
+
+      const highlightsPath = path.join(tmpDir, "highlights.mp4");
+      // Concatenate the transcoded segments (copy codec since they are uniform specs)
+      const hlCmd = `ffmpeg -y -f concat -safe 0 -i "${hlConcatListPath}" -c copy "${highlightsPath}"`;
+      console.log("[FFmpeg] Highlights concat running:", hlCmd);
+      await execAsync(hlCmd);
+
+      // Upload highlights to YouTube
       await updateJob(jobId, { status: "uploading_highlights", progress: 85 });
-      await updateMatchJob(matchId, { ...jobBase, status: "uploading_highlights", progress: 85, trimmedYoutubeUrl: trimmedUrl });
+      await updateMatchJob(matchId, { ...jobBase, status: "uploading_highlights", progress: 85 });
 
       highlightsUrl = await uploadToYouTube(
-        hlOutputPath,
-        `[Highlights] ${teamA} vs ${teamB} — Perspective ${perspective}`,
-        `Best rallies from the match.`
+        highlightsPath,
+        `${matchLabel} — Highlights`,
+        `Rallies compilation of ${teamA} vs ${teamB}.`
       );
-      const { db: db3 } = getFirebaseClients();
-      await db3.collection("matches").doc(matchId).update({
+
+      // Save Highlights Url to Match
+      await db.collection("matches").doc(matchId).update({
         matchHighlightsUrl: highlightsUrl,
       });
-    } else {
-      console.log("[Pipeline] No highlights marked — skipping highlights upload");
     }
 
-    // ── 7. Mark complete ──────────────────────────────────────────────────
+    // ── 5. Complete pipeline & create notifications ──────────────────────
     const finalJobData: Record<string, unknown> = {
-      ...jobBase,
       status: "complete",
       progress: 100,
-      trimmedYoutubeUrl: trimmedUrl,
       completedAt: Date.now(),
+      trimmedYoutubeUrl: trimmedUrl,
     };
-    if (highlightsUrl) finalJobData.highlightsYoutubeUrl = highlightsUrl;
+    if (highlightsUrl) {
+      finalJobData.highlightsYoutubeUrl = highlightsUrl;
+    }
 
     await updateJob(jobId, finalJobData);
-    await updateMatchJob(matchId, finalJobData);
-    console.log("[Pipeline] ✅ Complete");
+
+    await db.collection("matches").doc(matchId).update({
+      status: "processed",
+      processingJob: finalJobData,
+    });
+
+    // Create notifications for all participants in active rosters
+    const activeParticipants = Array.from(new Set([...(matchData.activeRosterA || []), ...(matchData.activeRosterB || [])]));
+    for (const uid of activeParticipants) {
+      if (!uid) continue;
+      const notifRef = db.collection("notifications").doc();
+      await notifRef.set({
+        id: notifRef.id,
+        userId: uid,
+        type: "video_processed",
+        matchId: matchId,
+        title: "Match Videos Ready! 📹",
+        message: `VOD and highlights are now available for ${matchLabel}.`,
+        read: false,
+        createdAt: Date.now(),
+      });
+    }
+
+    console.log("[Pipeline] ✅ Completed successfully.");
 
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err);
-    console.error("[Pipeline] ❌ Error:", message);
+    console.error("[Pipeline] ❌ Error occurred:", message);
     await updateJob(jobId, { status: "error", error: message });
-    await updateMatchJob(matchId, { id: jobId, matchId, perspective, rawStoragePath, status: "error", error: message });
+    await updateMatchJob(matchId, { status: "error", error: message });
     throw err;
-
   } finally {
-    // Clean up tmp files
-    try { fs.rmSync(tmpDir, { recursive: true, force: true }); } catch { /* ignore */ }
+    // Clean up temporary workspace directory
+    try {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    } catch { /* ignore */ }
   }
 }
 
 // ─── Express server ──────────────────────────────────────────────────────────
-
 const app = express();
-app.use(express.json({ limit: "1mb" }));
+app.use(express.json({ limit: "5mb" }));
 
 app.get("/health", (_req: Request, res: Response) => {
   res.json({ ok: true, service: "grass-volleyball-processor" });
 });
 
 app.post("/process", async (req: Request, res: Response) => {
-  const { jobId, matchId, perspective, rawStoragePath } = req.body as ProcessRequest;
+  const { jobId, matchId, perspectiveA, perspectiveB, winner, events } = req.body as ProcessRequest;
 
-  if (!jobId || !matchId || !perspective || !rawStoragePath) {
-    res.status(400).json({ error: "Missing required fields: jobId, matchId, perspective, rawStoragePath" });
+  if (!jobId || !matchId || (!perspectiveA && !perspectiveB) || !winner || !events) {
+    res.status(400).json({ error: "Missing required fields: jobId, matchId, perspectiveA/B, winner, events" });
     return;
   }
 
-  console.log(`[Server] Received job ${jobId} — matchId=${matchId} perspective=${perspective}`);
+  console.log(`[Server] Received consolidated job ${jobId} — matchId=${matchId}`);
 
-  // Respond immediately so the caller doesn't time out; process async
+  // Dispatch job asynchronously and return 202 immediately
   res.status(202).json({ ok: true, jobId });
 
-  runPipeline({ jobId, matchId, perspective, rawStoragePath }).catch((err) => {
-    console.error("[Server] Pipeline failed for job", jobId, err);
+  runPipeline({ jobId, matchId, perspectiveA, perspectiveB, winner, events }).catch((err) => {
+    console.error("[Server] Pipeline failed asynchronously for job", jobId, err);
   });
 });
 

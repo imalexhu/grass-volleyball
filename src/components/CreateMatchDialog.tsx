@@ -25,6 +25,7 @@ import { useAuth } from "@/contexts/AuthContext";
 const createMatchSchema = z.object({
   label: z.string().min(1, "Match label is required"),
   pointTarget: z.number().min(1, "Point target must be at least 1").max(100, "Point target cannot exceed 100"),
+  rosterSize: z.number().min(2).max(4),
 });
 
 type CreateMatchFormValues = z.infer<typeof createMatchSchema>;
@@ -55,6 +56,7 @@ export function CreateMatchDialog() {
     defaultValues: {
       label: "",
       pointTarget: 21,
+      rosterSize: 4,
     },
   });
 
@@ -66,6 +68,7 @@ export function CreateMatchDialog() {
       const matchId = await createCasualMatch(userProfile.id, {
         label: data.label,
         pointTarget: data.pointTarget,
+        rosterSize: data.rosterSize,
       });
 
       // Fetch the created match details (or fetch enough to show codes)
@@ -170,6 +173,20 @@ export function CreateMatchDialog() {
                   disabled={mutation.isPending}
                 />
                 {errors.pointTarget && <p className="text-xs text-destructive">{errors.pointTarget.message}</p>}
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="rosterSize">Match Format</Label>
+                <select
+                  id="rosterSize"
+                  className="flex h-10 w-full rounded-xl border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                  {...register("rosterSize", { valueAsNumber: true })}
+                  disabled={mutation.isPending}
+                >
+                  <option value={4}>4v4 (Standard)</option>
+                  <option value={3}>3v3</option>
+                  <option value={2}>2v2</option>
+                </select>
+                {errors.rosterSize && <p className="text-xs text-destructive">{errors.rosterSize.message}</p>}
               </div>
             </div>
             <DialogFooter>

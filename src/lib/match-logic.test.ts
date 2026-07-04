@@ -64,8 +64,17 @@ describe("Court Rotation Logic", () => {
     expect(roster).toEqual(["a", "b", "c", "d"]);
   });
 
-  it("returns original array if length is not 4", () => {
-    expect(rotateClockwise(["a", "b"])).toEqual(["a", "b"]);
+  it("returns original array if length is <= 1", () => {
+    expect(rotateClockwise([])).toEqual([]);
+    expect(rotateClockwise(["a"])).toEqual(["a"]);
+  });
+
+  it("rotates roster of length 2 correctly", () => {
+    expect(rotateClockwise(["a", "b"])).toEqual(["b", "a"]);
+  });
+
+  it("rotates roster of length 3 correctly", () => {
+    expect(rotateClockwise(["a", "b", "c"])).toEqual(["c", "a", "b"]);
   });
 });
 

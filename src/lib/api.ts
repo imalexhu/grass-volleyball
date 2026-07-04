@@ -934,7 +934,7 @@ export const generateJoinCode = async (): Promise<string> => {
 /** Creates a new casual match in setup phase with two unique join codes. */
 export const createCasualMatch = async (
   adminId: string,
-  config: { label: string; pointTarget: number }
+  config: { label: string; pointTarget: number; rosterSize?: number }
 ): Promise<string> => {
   const joinCodeA = await generateJoinCode();
   let joinCodeB = await generateJoinCode();
@@ -952,6 +952,7 @@ export const createCasualMatch = async (
     activeRosterA: [],
     activeRosterB: [],
     pointTarget: config.pointTarget,
+    rosterSize: config.rosterSize || 4,
     status: "active",
     phase: "setup",
     servingTeam: "A",
@@ -1013,7 +1014,8 @@ export const joinMatch = async (joinCode: string, userId: string): Promise<{ mat
     if (!alreadyJoined) {
       const playersA = [...(match.playersA || []), matchPlayer];
       const activeRosterA = [...(match.activeRosterA || [])];
-      if (activeRosterA.length < 4 && !activeRosterA.includes(userId)) {
+      const limit = match.rosterSize || 4;
+      if (activeRosterA.length < limit && !activeRosterA.includes(userId)) {
         activeRosterA.push(userId);
       }
       await updateDoc(matchRef, sanitizeData({ playersA, activeRosterA }));
@@ -1023,7 +1025,8 @@ export const joinMatch = async (joinCode: string, userId: string): Promise<{ mat
     if (!alreadyJoined) {
       const playersB = [...(match.playersB || []), matchPlayer];
       const activeRosterB = [...(match.activeRosterB || [])];
-      if (activeRosterB.length < 4 && !activeRosterB.includes(userId)) {
+      const limit = match.rosterSize || 4;
+      if (activeRosterB.length < limit && !activeRosterB.includes(userId)) {
         activeRosterB.push(userId);
       }
       await updateDoc(matchRef, sanitizeData({ playersB, activeRosterB }));
@@ -1033,7 +1036,7 @@ export const joinMatch = async (joinCode: string, userId: string): Promise<{ mat
   return { matchId: match.id, team };
 };
 
-/** Updates the active 4-player roster list for Team A or Team B. */
+/** Updates the active player roster list for Team A or Team B. */
 export const setActiveRoster = async (matchId: string, team: "A" | "B", userIds: string[]): Promise<void> => {
   const matchRef = doc(db, "matches", matchId);
   if (team === "A") {
@@ -1157,5 +1160,32 @@ export const subscribeToNotifications = (
     }
   );
 };
+
+/** Triggers Cloud Run video processing for the entire match (trimmed VOD and highlights). */
+export const triggerHighlightsProcessing = async (
+  jobId: string,
+  matchId: string,
+  payload: {
+    perspectiveA?: { rawStoragePath: string; videoOffset: number };
+    perspectiveB?: { rawStoragePath: string; videoOffset: number };
+    winner: "A" | "B";
+    events: MatchEvent[];
+  }
+): Promise<void> => {
+  const url = import.meta.env.VITE_CLOUD_RUN_PROCESSOR_URL;
+  if (!url) throw new Error("VITE_CLOUD_RUN_PROCESSOR_URL is not set in .env");
+
+  const resp = await fetch(`${url}/process`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ jobId, matchId, ...payload }),
+  });
+
+  if (!resp.ok) {
+    const text = await resp.text();
+    throw new Error(`Cloud Run error ${resp.status}: ${text}`);
+  }
+};
+
 
 

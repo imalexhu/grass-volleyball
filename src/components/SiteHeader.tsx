@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Volleyball, LogOut, Menu } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Sheet, SheetContent, SheetTrigger, SheetTitle, SheetHeader } from "@/components/ui/sheet";
+import { ActivityFeed } from "@/components/ActivityFeed";
 
 export function SiteHeader() {
   const { user, logout } = useAuth();
@@ -112,6 +113,7 @@ export function SiteHeader() {
         <div className="flex items-center gap-2">
           {user ? (
             <>
+              <ActivityFeed />
               <Button asChild variant="ghost" size="sm" className="hidden md:flex text-muted-foreground hover:text-foreground">
                 <Link to="/profile">Profile</Link>
               </Button>

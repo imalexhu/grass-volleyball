@@ -130,6 +130,7 @@ export interface Match {
 
   // ── Scoring Config ──
   pointTarget?: number;           // First to N (default 21)
+  rosterSize?: number;            // Number of active players per team (2, 3, or 4)
 
   // ── Live State ──
   scoreA?: number;

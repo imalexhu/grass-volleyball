@@ -36,7 +36,11 @@ function Landing() {
   }, []);
 
   useEffect(() => {
-    getTournaments().then(setTournaments);
+    getTournaments()
+      .then(setTournaments)
+      .catch((err) => {
+        console.error("Failed to fetch tournaments (likely public permissions are not configured in Firestore rules):", err);
+      });
   }, []);
 
   const upcoming = tournaments.filter((t) => t.status === "open" || t.status === "filled").slice(0, 3);

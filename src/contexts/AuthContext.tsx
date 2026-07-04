@@ -29,25 +29,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      setUser(user);
-      if (user) {
-        let profile = await getUserProfile(user.uid);
-        if (!profile) {
-          profile = {
-            id: user.uid,
-            email: user.email,
-            displayName: user.displayName,
-            role: "player" as const,
-            teamIds: [],
-            joinedAt: Date.now(),
-          };
-          await createUserProfile(profile);
+      try {
+        setUser(user);
+        if (user) {
+          let profile = await getUserProfile(user.uid);
+          if (!profile) {
+            profile = {
+              id: user.uid,
+              email: user.email,
+              displayName: user.displayName,
+              role: "player" as const,
+              teamIds: [],
+              joinedAt: Date.now(),
+            };
+            await createUserProfile(profile);
+          }
+          setUserProfile(profile);
+        } else {
+          setUserProfile(null);
         }
-        setUserProfile(profile);
-      } else {
-        setUserProfile(null);
+      } catch (error) {
+        console.error("Error in onAuthStateChanged profile fetching:", error);
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
     });
 
     return unsubscribe;
