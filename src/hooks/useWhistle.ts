@@ -6,7 +6,7 @@ import { useRef } from "react";
  * Requires no network requests or external asset files.
  */
 export function useWhistle() {
-  const play = () => {
+  const play = async () => {
     if (typeof window === "undefined") return;
 
     const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
@@ -14,6 +14,9 @@ export function useWhistle() {
 
     try {
       const ctx = new AudioContextClass();
+      if (ctx.state === "suspended") {
+        await ctx.resume();
+      }
       const now = ctx.currentTime;
 
       // Bandpass filter to clean up harmonics and focus the sound

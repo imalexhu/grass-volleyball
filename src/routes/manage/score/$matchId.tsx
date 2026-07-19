@@ -20,7 +20,7 @@ import { QRCodeSVG } from "qrcode.react";
 import { doc, updateDoc } from "firebase/firestore";
 
 import { db } from "@/lib/firebase";
-import { subscribeToMatch } from "@/lib/api";
+import { subscribeToMatch, createRematch } from "@/lib/api";
 import type { Match, MatchEvent, MatchPlayer } from "@/lib/types";
 import { CourtView } from "@/components/CourtView";
 import { useWhistle } from "@/hooks/useWhistle";
@@ -49,10 +49,11 @@ function ScorePad() {
   const [match, setMatch] = useState<Match | null>(null);
   const [checklist, setChecklist] = useState({ recording: false, ready: false });
   const [showQRModal, setShowQRModal] = useState<"A" | "B" | null>(null);
-  const [showHighlightSelector, setShowHighlightSelector] = useState(false);
+  const [highlightMode, setHighlightMode] = useState(false);
   const [showWinModal, setShowWinModal] = useState(false);
   const [winnerTeam, setWinnerTeam] = useState<"A" | "B" | null>(null);
   const [finalizing, setFinalizing] = useState(false);
+  const [rematching, setRematching] = useState(false);
 
   // Subscribe to match changes
   useEffect(() => {
@@ -90,9 +91,24 @@ function ScorePad() {
           <div className="bg-muted/40 p-4 rounded-xl font-mono text-lg">
             Final Score: {match.scoreA ?? 0} - {match.scoreB ?? 0}
           </div>
-          <Button asChild className="w-full h-12 rounded-xl">
-            <Link to="/manage">Return to Dashboard</Link>
-          </Button>
+          <div className="flex flex-col gap-2 w-full">
+            <Button
+              className="w-full h-12 bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-600 hover:to-green-700 text-white font-black text-sm rounded-xl gap-2 flex items-center justify-center"
+              onClick={handleTriggerRematch}
+              disabled={rematching}
+            >
+              {rematching ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" /> CREATING REMATCH...
+                </>
+              ) : (
+                "QUICK REMATCH"
+              )}
+            </Button>
+            <Button asChild variant="outline" className="w-full h-12 rounded-xl">
+              <Link to="/manage">Return to Dashboard</Link>
+            </Button>
+          </div>
         </div>
       </div>
     );
@@ -347,6 +363,30 @@ function ScorePad() {
     } finally {
       setFinalizing(false);
       setShowWinModal(false);
+    }
+  };
+
+  const handleTriggerRematch = async () => {
+    setRematching(true);
+    try {
+      if (match.status === "active") {
+        const matchRef = doc(db, "matches", match.id);
+        await updateDoc(matchRef, {
+          phase: "complete",
+          status: "action_required",
+          completedAt: Date.now(),
+        });
+      }
+
+      const newMatchId = await createRematch(match);
+      toast.success("Rematch created! Ready to play.");
+      setShowWinModal(false);
+      navigate({ to: "/manage/score/$matchId", params: { matchId: newMatchId } });
+    } catch (err) {
+      console.error("Failed to trigger rematch:", err);
+      toast.error("Failed to start rematch.");
+    } finally {
+      setRematching(false);
     }
   };
 
@@ -634,18 +674,52 @@ function ScorePad() {
         </div>
 
         {/* Court View */}
-        <div className="space-y-1">
+        <div className="space-y-2">
           <div className="flex items-center justify-between px-1">
             <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
               Court Layout & Serve
             </span>
-            {rallyInProgress && (
+            {rallyInProgress && !highlightMode && (
               <span className="text-[10px] font-bold text-amber-500 animate-pulse uppercase flex items-center gap-1">
                 <span className="h-1.5 w-1.5 rounded-full bg-amber-500 inline-block animate-ping" />
                 Rally Active
               </span>
             )}
+            {highlightMode && (
+              <span className="text-[10px] font-bold text-yellow-500 animate-pulse uppercase flex items-center gap-1">
+                <span className="h-1.5 w-1.5 rounded-full bg-yellow-500 inline-block animate-ping" />
+                Highlight Selector Active
+              </span>
+            )}
           </div>
+
+          {highlightMode && (
+            <div className="bg-yellow-500/10 border border-yellow-500/30 text-yellow-600 dark:text-yellow-400 p-3.5 rounded-xl text-center text-xs font-semibold animate-fade-in flex flex-col gap-2 shadow-sm">
+              <div>Tap a player card on the court below to attribute the highlight to them.</div>
+              <div className="flex gap-2 justify-center mt-1">
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  className="h-8 text-[11px] font-bold bg-yellow-500 hover:bg-yellow-600 text-black border-none"
+                  onClick={() => {
+                    handleMarkHighlight();
+                    setHighlightMode(false);
+                  }}
+                >
+                  General Match Highlight
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-8 text-[11px] font-bold"
+                  onClick={() => setHighlightMode(false)}
+                >
+                  Cancel
+                </Button>
+              </div>
+            </div>
+          )}
+
           <CourtView
             teamA={{
               name: match.teamA || "Team A",
@@ -660,6 +734,11 @@ function ScorePad() {
             servingTeam={currentServingTeam}
             interactive={true}
             onReorder={handleReorderRoster}
+            highlightMode={highlightMode}
+            onPlayerClick={async (team, playerId, displayName) => {
+              await handleMarkHighlight(playerId, displayName);
+              setHighlightMode(false);
+            }}
           />
         </div>
 
@@ -693,10 +772,15 @@ function ScorePad() {
         {/* Roster & Stats Helpers */}
         <div className="grid grid-cols-2 gap-3">
           <Button
-            onClick={() => setShowHighlightSelector(true)}
-            variant="outline"
+            onClick={() => setHighlightMode(!highlightMode)}
+            variant={highlightMode ? "default" : "outline"}
             disabled={events.length === 0}
-            className="h-12 rounded-xl text-xs font-bold gap-2 bg-yellow-500/5 hover:bg-yellow-500/10 border-yellow-500/20 text-yellow-600 dark:text-yellow-400"
+            className={cn(
+              "h-12 rounded-xl text-xs font-bold gap-2 transition-all",
+              highlightMode
+                ? "bg-yellow-500 hover:bg-yellow-600 text-black shadow-[0_0_15px_rgba(250,204,21,0.5)] border-yellow-400"
+                : "bg-yellow-500/5 hover:bg-yellow-500/10 border-yellow-500/20 text-yellow-600 dark:text-yellow-400"
+            )}
           >
             <Star className="h-4 w-4 fill-current" />
             Highlight ({highlightsCount})
@@ -828,86 +912,7 @@ function ScorePad() {
         </DialogContent>
       </Dialog>
 
-      {/* Highlight Attribution Selector Dialog */}
-      <Dialog open={showHighlightSelector} onOpenChange={setShowHighlightSelector}>
-        <DialogContent className="max-w-[360px] rounded-2xl">
-          <DialogHeader>
-            <DialogTitle>Select Highlight Contributor</DialogTitle>
-            <DialogDescription>
-              Attribute this highlight to a player in this rally, or mark it as a general match highlight.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-2">
-            {/* Team A active roster */}
-            <div className="space-y-1.5">
-              <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest px-1">
-                {match.teamA || "Team A"}
-              </span>
-              <div className="grid grid-cols-2 gap-2">
-                {activeRosterA.map((uid) => {
-                  const p = playersA.find((pl) => pl.userId === uid);
-                  if (!p) return null;
-                  return (
-                    <Button
-                      key={uid}
-                      variant="secondary"
-                      size="sm"
-                      className="justify-start truncate font-semibold text-xs py-2 h-9 rounded-lg"
-                      onClick={() => handleMarkHighlight(p.userId, p.displayName)}
-                    >
-                      <Users className="h-3.5 w-3.5 mr-1 shrink-0 opacity-60" />
-                      <span className="truncate">{p.displayName}</span>
-                    </Button>
-                  );
-                })}
-              </div>
-            </div>
 
-            {/* Team B active roster */}
-            <div className="space-y-1.5">
-              <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest px-1">
-                {match.teamB || "Team B"}
-              </span>
-              <div className="grid grid-cols-2 gap-2">
-                {activeRosterB.map((uid) => {
-                  const p = playersB.find((pl) => pl.userId === uid);
-                  if (!p) return null;
-                  return (
-                    <Button
-                      key={uid}
-                      variant="secondary"
-                      size="sm"
-                      className="justify-start truncate font-semibold text-xs py-2 h-9 rounded-lg"
-                      onClick={() => handleMarkHighlight(p.userId, p.displayName)}
-                    >
-                      <Users className="h-3.5 w-3.5 mr-1 shrink-0 opacity-60" />
-                      <span className="truncate">{p.displayName}</span>
-                    </Button>
-                  );
-                })}
-              </div>
-            </div>
-
-            <div className="border-t pt-3 flex flex-col gap-2">
-              <Button
-                variant="default"
-                className="w-full gap-2 rounded-lg text-xs"
-                onClick={() => handleMarkHighlight()}
-              >
-                <Volleyball className="h-4 w-4 text-primary-foreground" />
-                General Match Highlight
-              </Button>
-              <Button
-                variant="ghost"
-                className="w-full text-xs"
-                onClick={() => setShowHighlightSelector(false)}
-              >
-                Cancel
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
 
       {/* Match Win Overlay Dialog */}
       <Dialog open={showWinModal} onOpenChange={() => {}}>
@@ -935,9 +940,23 @@ function ScorePad() {
 
           <DialogFooter className="flex-col gap-2 mt-2">
             <Button
-              className="w-full h-12 bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-600 hover:to-green-700 text-white font-black text-sm rounded-xl gap-2"
+              className="w-full h-12 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white font-black text-sm rounded-xl gap-2 flex items-center justify-center"
+              onClick={handleTriggerRematch}
+              disabled={rematching || finalizing}
+            >
+              {rematching ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" /> CREATING REMATCH...
+                </>
+              ) : (
+                "QUICK REMATCH"
+              )}
+            </Button>
+            <Button
+              variant="secondary"
+              className="w-full h-12 font-bold text-sm rounded-xl gap-2"
               onClick={handleFinalizeMatch}
-              disabled={finalizing}
+              disabled={finalizing || rematching}
             >
               {finalizing ? (
                 <>
@@ -951,7 +970,7 @@ function ScorePad() {
               variant="outline"
               className="w-full text-xs"
               onClick={() => setShowWinModal(false)}
-              disabled={finalizing}
+              disabled={finalizing || rematching}
             >
               Back to Score Sheet
             </Button>

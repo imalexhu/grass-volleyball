@@ -969,6 +969,50 @@ export const createCasualMatch = async (
   return docRef.id;
 };
 
+/** Creates a new rematch copy of a completed casual match, resetting state but retaining player configurations. */
+export const createRematch = async (parentMatch: Match): Promise<string> => {
+  const joinCodeA = await generateJoinCode();
+  let joinCodeB = await generateJoinCode();
+  while (joinCodeB === joinCodeA) {
+    joinCodeB = await generateJoinCode();
+  }
+
+  let label = parentMatch.label || "Casual Match";
+  if (!label.includes("Rematch")) {
+    label = `${label} (Rematch)`;
+  }
+
+  const matchData: Omit<Match, "id"> = {
+    label,
+    createdBy: parentMatch.createdBy || "",
+    joinCodeA,
+    joinCodeB,
+    playersA: parentMatch.playersA || [],
+    playersB: parentMatch.playersB || [],
+    activeRosterA: parentMatch.activeRosterA || [],
+    activeRosterB: parentMatch.activeRosterB || [],
+    pointTarget: parentMatch.pointTarget ?? 21,
+    rosterSize: parentMatch.rosterSize || 4,
+    status: "active",
+    phase: "setup",
+    servingTeam: "A",
+    scoreA: 0,
+    scoreB: 0,
+    events: [],
+    scheduledAt: new Date().toISOString(),
+    createdAt: Date.now(),
+    teamA: parentMatch.teamA || "Team A",
+    teamB: parentMatch.teamB || "Team B",
+    tournamentId: parentMatch.tournamentId || undefined,
+    stage: parentMatch.stage || undefined,
+    pool: parentMatch.pool || undefined,
+    court: parentMatch.court || undefined,
+  };
+
+  const docRef = await addDoc(matchesCollection, sanitizeData(matchData));
+  return docRef.id;
+};
+
 /** Finds an active match by join code and determines which team it corresponds to. */
 export const getMatchByJoinCode = async (code: string): Promise<{ match: Match; team: "A" | "B" } | null> => {
   const upperCode = code.toUpperCase();

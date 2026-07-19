@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Volleyball, Shield } from "lucide-react";
+import { Volleyball, Shield, Star } from "lucide-react";
 import { getCourtPosition } from "@/lib/match-logic";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { cn } from "@/lib/utils";
@@ -23,6 +23,8 @@ interface CourtViewProps {
   interactive?: boolean;
   onReorder?: (team: "A" | "B", newPositions: string[]) => void;
   className?: string;
+  highlightMode?: boolean;
+  onPlayerClick?: (team: "A" | "B", userId: string, displayName: string) => void;
 }
 
 export function CourtView({
@@ -32,6 +34,8 @@ export function CourtView({
   interactive = false,
   onReorder,
   className,
+  highlightMode = false,
+  onPlayerClick,
 }: CourtViewProps) {
   const [draggedInfo, setDraggedInfo] = useState<{ team: "A" | "B"; index: number } | null>(null);
   const [dragOverIndex, setDragOverIndex] = useState<{ team: "A" | "B"; index: number } | null>(null);
@@ -128,17 +132,24 @@ export function CourtView({
               return (
                 <div
                   key={posIndex}
-                  draggable={interactive}
+                  draggable={interactive && !highlightMode}
                   onDragStart={(e) => handleDragStart(team, posIndex, e)}
                   onDragOver={(e) => handleDragOver(team, posIndex, e)}
                   onDragLeave={handleDragLeave}
                   onDrop={(e) => handleDrop(team, posIndex, e)}
+                  onClick={() => {
+                    if (highlightMode && onPlayerClick && player) {
+                      onPlayerClick(team, player.userId, player.displayName);
+                    }
+                  }}
                   className={cn(
                     "relative flex flex-col items-center justify-center p-3 rounded-xl transition-all duration-300 select-none",
-                    interactive ? "cursor-grab active:cursor-grabbing hover:scale-[1.02]" : "",
+                    highlightMode
+                      ? "cursor-pointer ring-2 ring-yellow-400 ring-offset-2 ring-offset-green-800 shadow-[0_0_15px_rgba(250,204,21,0.4)] hover:scale-[1.04] bg-yellow-950/20 border-yellow-400/50"
+                      : (interactive ? "cursor-grab active:cursor-grabbing hover:scale-[1.02]" : ""),
                     isDragged ? "opacity-40 scale-95" : "",
-                    isOver ? "bg-primary/20 border-2 border-dashed border-primary shadow-lg" : "bg-black/45 border border-white/10 backdrop-blur-md",
-                    isPlayerServing
+                    isOver ? "bg-primary/20 border-2 border-dashed border-primary shadow-lg" : (!highlightMode ? "bg-black/45 border border-white/10 backdrop-blur-md" : ""),
+                    isPlayerServing && !highlightMode
                       ? "ring-2 ring-amber-400 ring-offset-2 ring-offset-green-800 shadow-[0_0_15px_rgba(251,191,36,0.5)] border-amber-400/50"
                       : "",
                     "h-full w-full"
@@ -149,15 +160,22 @@ export function CourtView({
                     <span className="text-[10px] font-bold text-white/50 tracking-wider font-mono">
                       P{posIndex + 1}
                     </span>
-                    {isPlayerServing && (
+                    {isPlayerServing && !highlightMode && (
                       <span className="flex h-1.5 w-1.5 rounded-full bg-amber-400 animate-ping" />
                     )}
                   </div>
 
                   {/* Serve Ball Icon */}
-                  {isPlayerServing && (
+                  {isPlayerServing && !highlightMode && (
                     <div className="absolute top-1.5 right-2 text-amber-400 animate-pulse">
                       <Volleyball className="h-3.5 w-3.5" />
+                    </div>
+                  )}
+
+                  {/* Highlight mode overlay star */}
+                  {highlightMode && player && (
+                    <div className="absolute top-1.5 right-2 text-yellow-400 animate-pulse">
+                      <Star className="h-3.5 w-3.5 fill-current" />
                     </div>
                   )}
 
